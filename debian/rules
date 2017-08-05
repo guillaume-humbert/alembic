@@ -1,10 +1,12 @@
 #!/usr/bin/make -f
 
-UPSTREAM_GIT ?= https://bitbucket.org/zzzeek/alembic.git
-include /usr/share/openstack-pkg-tools/pkgos.make
+include /usr/share/dpkg/pkg-info.mk
+export PYBUILD_NAME=alembic
+export PYBUILD_BEFORE_TEST=cp {dir}/setup.cfg {build_dir}
+export PYBUILD_AFTER_TEST=rm {build_dir}/setup.cfg
 
 %:
-	dh $@ --buildsystem=python_distutils --with=python2,python3,sphinxdoc
+	dh $@ --with python2,python3,sphinxdoc --buildsystem=pybuild
 
 override_dh_sphinxdoc:
 ifeq (,$(findstring nodocs, $(DEB_BUILD_OPTIONS)))
@@ -13,18 +15,12 @@ ifeq (,$(findstring nodocs, $(DEB_BUILD_OPTIONS)))
 endif
 
 override_dh_auto_install:
-	pkgos-dh_auto_install
+	dh_auto_install
 
-override_dh_auto_test:
-ifeq (,$(findstring nocheck, $(DEB_BUILD_OPTIONS)))
-	set -e ; for pyvers in 2.7 ${PYTHON3S}; do \
-		python$$pyvers -m pytest ; \
-	done
-endif
+	rm -rf debian/python-alembic/usr/bin
+	mkdir -p debian/alembic/usr
+	mv $(CURDIR)/debian/python3-alembic/usr/bin $(CURDIR)/debian/alembic/usr/
 
 help2man:
-	help2man --version-string=$(VERSION) -n "lightweight database migration tool for usage with the SQLAlchemy" -N alembic > alembic.1
-	sed -i "s/,\(\w\)/, \1/g" alembic.1
-
-override_dh_python3:
-	dh_python3 --shebang=/usr/bin/python3
+	help2man --version-string=$(DEB_SOURCE) -n "lightweight database migration tool for usage with the SQLAlchemy" -N alembic > debian/alembic.1
+	sed -i "s/,\(\w\)/, \1/g" debian/alembic.1
