@@ -4,6 +4,296 @@ Changelog
 ==========
 
 .. changelog::
+    :version: 0.9.3
+    :released: July 6, 2017
+
+    .. change::
+      :tags: feature, runtime
+
+      Added a new callback hook 
+      :paramref:`.EnvironmentContext.configure.on_version_apply`,
+      which allows user-defined code to be invoked each time an individual
+      upgrade, downgrade, or stamp operation proceeds against a database.
+      Pull request courtesy John Passaro.
+
+    .. change:: 433
+      :tags: bug, autogenerate
+      :tickets: 433
+
+      Fixed bug where autogen comparison of a :class:`.Variant` datatype
+      would not compare to the dialect level type for the "default"
+      implementation of the :class:`.Variant`, returning the type as changed
+      between database and table metadata.
+
+    .. change:: 431
+      :tags: bug, tests
+      :tickets: 431
+
+      Fixed unit tests to run correctly under the SQLAlchemy 1.0.x series
+      prior to version 1.0.10 where a particular bug involving Postgresql
+      exclude constraints was fixed.
+
+.. changelog::
+    :version: 0.9.2
+    :released: May 18, 2017
+
+    .. change:: 429
+      :tags: bug, mssql
+      :tickets: 429
+
+      Repaired :meth:`.Operations.rename_table` for SQL Server when the
+      target table is in a remote schema, the schema name is omitted from
+      the "new name" argument.
+
+    .. change:: 425
+      :tags: feature, commands
+      :tickets: 425
+
+      Added a new configuration option ``timezone``, a string timezone name
+      that will be applied to the create date timestamp rendered
+      inside the revision file as made availble to the ``file_template`` used
+      to generate the revision filename.  Note this change adds the
+      ``python-dateutil`` package as a dependency.
+
+    .. change:: 421
+      :tags: bug, autogenerate
+      :tickets: 421
+
+      The autogenerate compare scheme now takes into account the name truncation
+      rules applied by SQLAlchemy's DDL compiler to the names of the
+      :class:`.Index` object, when these names are dynamically truncated
+      due to a too-long identifier name.   As the identifier truncation is
+      deterministic, applying the same rule to the metadata name allows
+      correct comparison to the database-derived name.
+
+    .. change:: 419
+      :tags: bug environment
+      :tickets: 419
+
+      A warning is emitted when an object that's not a
+      :class:`~sqlalchemy.engine.Connection` is passed to
+      :meth:`.EnvironmentContext.configure`.  For the case of a
+      :class:`~sqlalchemy.engine.Engine` passed, the check for "in transaction"
+      introduced in version 0.9.0 has been relaxed to work in the case of an
+      attribute error, as some users appear to be passing an
+      :class:`~sqlalchemy.engine.Engine` and not a
+      :class:`~sqlalchemy.engine.Connection`.
+
+.. changelog::
+    :version: 0.9.1
+    :released: March 1, 2017
+
+    .. change:: 417
+      :tags: bug, commands
+      :tickets: 417, 369
+
+      An adjustment to the bug fix for :ticket:`369` to accommodate for
+      env.py scripts that use an enclosing transaction distinct from the
+      one that the context provides, so that the check for "didn't commit
+      the transaction" doesn't trigger in this scenario.
+
+.. changelog::
+    :version: 0.9.0
+    :released: February 28, 2017
+
+    .. change:: 38
+      :tags: feature, autogenerate
+      :tickets: 38
+
+      The :paramref:`.EnvironmentContext.configure.target_metadata` parameter
+      may now be optionally specified as a sequence of :class:`.MetaData`
+      objects instead of a single :class:`.MetaData` object.  The
+      autogenerate process will process the sequence of :class:`.MetaData`
+      objects in order.
+
+    .. change:: 369
+      :tags: bug, commands
+      :tickets: 369
+
+      A :class:`.CommandError` is now raised when a migration file opens
+      a database transaction and does not close/commit/rollback, when
+      the backend database or environment options also specify transactional_ddl
+      is False.   When transactional_ddl is not in use, Alembic doesn't
+      close any transaction so a transaction opened by a migration file
+      will cause the following migrations to fail to apply.
+
+    .. change:: 413
+      :tags: bug, autogenerate, mysql
+      :tickets: 413
+
+      The ``autoincrement=True`` flag is now rendered within the
+      :meth:`.Operations.alter_column` operation if the source column indicates
+      that this flag should be set to True.  The behavior is sensitive to
+      the SQLAlchemy version in place, as the "auto" default option is new
+      in SQLAlchemy 1.1.  When the source column indicates autoincrement
+      as True or "auto", the flag will render as True if the original column
+      contextually indicates that it should have "autoincrement" keywords,
+      and when the source column explcitly sets it to False, this is also
+      rendered.  The behavior is intended to preserve the AUTO_INCREMENT flag
+      on MySQL as the column is fully recreated on this backend.  Note that this
+      flag does **not** support alteration of a column's "autoincrement" status,
+      as this is not portable across backends.
+
+    .. change:: 411
+      :tags: bug, postgresql
+      :tickets: 411
+
+      Fixed bug where Postgresql JSON/JSONB types rendered on SQLAlchemy
+      1.1 would render the "astext_type" argument which defaults to
+      the ``Text()`` type without the module prefix, similarly to the
+      issue with ARRAY fixed in :ticket:`85`.
+
+    .. change:: 85
+      :tags: bug, postgresql
+      :tickets: 85
+
+      Fixed bug where Postgresql ARRAY type would not render the import prefix
+      for the inner type; additionally, user-defined renderers take place
+      for the inner type as well as the outer type.  Pull request courtesy
+      Paul Brackin.
+
+    .. change:: process_revision_directives_command
+      :tags: feature, autogenerate
+
+      Added a keyword argument ``process_revision_directives`` to the
+      :func:`.command.revision` API call.  This function acts in the
+      same role as the environment-level
+      :paramref:`.EnvironmentContext.configure.process_revision_directives`,
+      and allows API use of the
+      command to drop in an ad-hoc directive process function.  This
+      function can be used among other things to place a complete
+      :class:`.MigrationScript` structure in place.
+
+    .. change:: 412
+      :tags: feature, postgresql
+      :tickets: 412
+
+      Added support for Postgresql EXCLUDE constraints, including the
+      operation directive :meth:`.Operations.create_exclude_constraints`
+      as well as autogenerate render support for the ``ExcludeConstraint``
+      object as present in a ``Table``.  Autogenerate detection for an EXCLUDE
+      constraint added or removed to/from an existing table is **not**
+      implemented as the SQLAlchemy Postgresql dialect does not yet support
+      reflection of EXCLUDE constraints.
+
+      Additionally, unknown constraint types now warn when
+      encountered within an autogenerate action rather than raise.
+
+    .. change:: fk_schema_compare
+      :tags: bug, operations
+
+      Fixed bug in :func:`.ops.create_foreign_key` where the internal table
+      representation would not be created properly if the foriegn key referred
+      to a table in a different schema of the same name.  Pull request
+      courtesy Konstantin Lebedev.
+
+.. changelog::
+    :version: 0.8.10
+    :released: January 17, 2017
+
+    .. change:: 406
+      :tags: bug, versioning
+      :tickets: 406
+
+      The alembic_version table, when initially created, now establishes a
+      primary key constraint on the "version_num" column, to suit database
+      engines that don't support tables without primary keys.   This behavior
+      can be controlled using the parameter
+      :paramref:`.EnvironmentContext.configure.version_table_pk`.  Note that
+      this change only applies to the initial creation of the alembic_version
+      table; it does not impact any existing alembic_version table already
+      present.
+
+    .. change:: 402
+      :tags: bug, batch
+      :tickets: 402
+
+      Fixed bug where doing ``batch_op.drop_constraint()`` against the
+      primary key constraint would fail to remove the "primary_key" flag
+      from the column, resulting in the constraint being recreated.
+
+    .. change:: update_uq_dedupe
+      :tags: bug, autogenerate, oracle
+
+      Adjusted the logic originally added for :ticket:`276` that detects MySQL
+      unique constraints which are actually unique indexes to be generalized
+      for any dialect that has this behavior, for SQLAlchemy version 1.0 and
+      greater.  This is to allow for upcoming SQLAlchemy support for unique
+      constraint reflection for Oracle, which also has no dedicated concept of
+      "unique constraint" and instead establishes a unique index.
+
+    .. change:: 356
+      :tags: bug, versioning
+      :tickets: 356
+
+      Added a file ignore for Python files of the form ``.#<name>.py``,
+      which are generated by the Emacs editor.  Pull request courtesy
+      Markus Mattes.
+
+.. changelog::
+    :version: 0.8.9
+    :released: November 28, 2016
+
+    .. change::  393
+      :tags: bug, autogenerate
+      :tickets: 393
+
+      Adjustment to the "please adjust!" comment in the script.py.mako
+      template so that the generated comment starts with a single pound
+      sign, appeasing flake8.
+
+    .. change::
+      :tags: bug, batch
+      :tickets: 391
+
+      Batch mode will not use CAST() to copy data if type_ is given, however
+      the basic type affinity matches that of the existing type.  This to
+      avoid SQLite's CAST of TIMESTAMP which results in truncation of the
+      data, in those cases where the user needs to add redundant type_ for
+      other reasons.
+
+    .. change::
+      :tags: bug, autogenerate
+      :tickets: 393
+
+      Continued pep8 improvements by adding appropriate whitespace in
+      the base template for generated migrations.  Pull request courtesy
+      Markus Mattes.
+
+    .. change::
+      :tags: bug, revisioning
+
+      Added an additional check when reading in revision files to detect
+      if the same file is being read twice; this can occur if the same directory
+      or a symlink equivalent is present more than once in version_locations.
+      A warning is now emitted and the file is skipped.  Pull request courtesy
+      Jiri Kuncar.
+
+    .. change::
+      :tags: bug, autogenerate
+      :tickets: 395
+
+      Fixed bug where usage of a custom TypeDecorator which returns a
+      per-dialect type via :meth:`.TypeDecorator.load_dialect_impl` that differs
+      significantly from the default "impl" for the type decorator would fail
+      to compare correctly during autogenerate.
+
+    .. change::
+      :tags: bug, autogenerate, postgresql
+      :tickets: 392
+
+      Fixed bug in Postgresql "functional index skip" behavior where a
+      functional index that ended in ASC/DESC wouldn't be detected as something
+      we can't compare in autogenerate, leading to duplicate definitions
+      in autogenerated files.
+
+    .. change::
+      :tags: bug, versioning
+
+      Fixed bug where the "base" specifier, as in "base:head", could not
+      be used explicitly when ``--sql`` mode was present.
+
+.. changelog::
     :version: 0.8.8
     :released: September 12, 2016
 

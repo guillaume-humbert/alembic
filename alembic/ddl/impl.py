@@ -240,6 +240,8 @@ class DefaultImpl(with_metaclass(ImplMeta)):
         metadata_type = metadata_column.type
 
         metadata_impl = metadata_type.dialect_impl(self.dialect)
+        if isinstance(metadata_impl, sqltypes.Variant):
+            metadata_impl = metadata_impl.impl.dialect_impl(self.dialect)
 
         # work around SQLAlchemy bug "stale value for type affinity"
         # fixed in 0.7.4
@@ -256,7 +258,7 @@ class DefaultImpl(with_metaclass(ImplMeta)):
         ):
             comparator = _type_comparators.get(conn_type._type_affinity, None)
 
-            return comparator and comparator(metadata_type, conn_type)
+            return comparator and comparator(metadata_impl, conn_type)
         else:
             return True
 
@@ -319,6 +321,9 @@ class DefaultImpl(with_metaclass(ImplMeta)):
 
         """
         self.static_output("COMMIT" + self.command_terminator)
+
+    def render_type(self, type_obj, autogen_context):
+        return False
 
 
 def _string_compare(t1, t2):

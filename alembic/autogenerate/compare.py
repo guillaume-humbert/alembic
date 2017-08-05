@@ -53,8 +53,6 @@ def _produce_net_changes(autogen_context, upgrade_ops):
 def _autogen_for_tables(autogen_context, upgrade_ops, schemas):
     inspector = autogen_context.inspector
 
-    metadata = autogen_context.metadata
-
     conn_table_names = set()
 
     version_table_schema = \
@@ -70,15 +68,15 @@ def _autogen_for_tables(autogen_context, upgrade_ops, schemas):
         conn_table_names.update(zip([s] * len(tables), tables))
 
     metadata_table_names = OrderedSet(
-        [(table.schema, table.name) for table in metadata.sorted_tables]
+        [(table.schema, table.name) for table in autogen_context.sorted_tables]
     ).difference([(version_table_schema, version_table)])
 
     _compare_tables(conn_table_names, metadata_table_names,
-                    inspector, metadata, upgrade_ops, autogen_context)
+                    inspector, upgrade_ops, autogen_context)
 
 
 def _compare_tables(conn_table_names, metadata_table_names,
-                    inspector, metadata, upgrade_ops, autogen_context):
+                    inspector, upgrade_ops, autogen_context):
 
     default_schema = inspector.bind.dialect.default_schema_name
 
@@ -98,7 +96,8 @@ def _compare_tables(conn_table_names, metadata_table_names,
     tname_to_table = dict(
         (
             no_dflt_schema,
-            metadata.tables[sa_schema._get_table_key(tname, schema)]
+            autogen_context.table_key_to_table[
+                sa_schema._get_table_key(tname, schema)]
         )
         for no_dflt_schema, (schema, tname) in zip(
             metadata_table_names_no_dflt_schema,
@@ -195,11 +194,14 @@ def _make_index(params, conn_table):
 
 
 def _make_unique_constraint(params, conn_table):
-    # TODO: add .info such as 'duplicates_index'
-    return sa_schema.UniqueConstraint(
+    uq = sa_schema.UniqueConstraint(
         *[conn_table.c[cname] for cname in params['column_names']],
         name=params['name']
     )
+    if 'duplicates_index' in params:
+        uq.info['duplicates_index'] = params['duplicates_index']
+
+    return uq
 
 
 def _make_foreign_key(params, conn_table):
@@ -275,6 +277,9 @@ def _compare_columns(schema, tname, conn_table, metadata_table,
 
 class _constraint_sig(object):
 
+    def md_name_to_sql_name(self, context):
+        return self.name
+
     def __eq__(self, other):
         return self.const == other.const
 
@@ -307,6 +312,9 @@ class _ix_constraint_sig(_constraint_sig):
         self.name = const.name
         self.sig = tuple(sorted([col.name for col in const.columns]))
         self.is_unique = bool(const.unique)
+
+    def md_name_to_sql_name(self, context):
+        return sqla_compat._get_index_final_name(context.dialect, self.const)
 
     @property
     def column_names(self):
@@ -364,6 +372,8 @@ def _compare_indexes_and_uniques(
 
     supports_unique_constraints = False
 
+    unique_constraints_duplicate_unique_indexes = False
+
     if conn_table is not None:
         # 1b. ... and from connection, if the table exists
         if hasattr(inspector, "get_unique_constraints"):
@@ -373,6 +383,15 @@ def _compare_indexes_and_uniques(
                 supports_unique_constraints = True
             except NotImplementedError:
                 pass
+            except TypeError:
+                # number of arguments is off for the base
+                # method in SQLAlchemy due to the cache decorator
+                # not being present
+                pass
+            else:
+                for uq in conn_uniques:
+                    if uq.get('duplicates_index'):
+                        unique_constraints_duplicate_unique_indexes = True
         try:
             conn_indexes = inspector.get_indexes(tname, schema=schema)
         except NotImplementedError:
@@ -383,6 +402,16 @@ def _compare_indexes_and_uniques(
         conn_uniques = set(_make_unique_constraint(uq_def, conn_table)
                            for uq_def in conn_uniques)
         conn_indexes = set(_make_index(ix, conn_table) for ix in conn_indexes)
+
+    # 2a. if the dialect dupes unique indexes as unique constraints
+    # (mysql and oracle), correct for that
+
+    if unique_constraints_duplicate_unique_indexes:
+        _correct_for_uq_duplicates_uix(
+            conn_uniques, conn_indexes,
+            metadata_unique_constraints,
+            metadata_indexes
+        )
 
     # 3. give the dialect a chance to omit indexes and constraints that
     # we know are either added implicitly by the DB or that the DB
@@ -410,7 +439,7 @@ def _compare_indexes_and_uniques(
 
     # 5. index things by name, for those objects that have names
     metadata_names = dict(
-        (c.name, c) for c in
+        (c.md_name_to_sql_name(autogen_context), c) for c in
         metadata_unique_constraints.union(metadata_indexes)
         if c.name is not None)
 
@@ -581,6 +610,48 @@ def _compare_indexes_and_uniques(
             obj_added(unnamed_metadata_uniques[uq_sig])
 
 
+def _correct_for_uq_duplicates_uix(
+    conn_unique_constraints,
+        conn_indexes,
+        metadata_unique_constraints,
+        metadata_indexes):
+
+    # dedupe unique indexes vs. constraints, since MySQL / Oracle
+    # doesn't really have unique constraints as a separate construct.
+    # but look in the metadata and try to maintain constructs
+    # that already seem to be defined one way or the other
+    # on that side.  This logic was formerly local to MySQL dialect,
+    # generalized to Oracle and others. See #276
+    metadata_uq_names = set([
+        cons.name for cons in metadata_unique_constraints
+        if cons.name is not None])
+
+    unnamed_metadata_uqs = set([
+        _uq_constraint_sig(cons).sig
+        for cons in metadata_unique_constraints
+        if cons.name is None
+    ])
+
+    metadata_ix_names = set([
+        cons.name for cons in metadata_indexes if cons.unique])
+    conn_ix_names = dict(
+        (cons.name, cons) for cons in conn_indexes if cons.unique
+    )
+
+    uqs_dupe_indexes = dict(
+        (cons.name, cons) for cons in conn_unique_constraints
+        if cons.info['duplicates_index']
+    )
+    for overlap in uqs_dupe_indexes:
+        if overlap not in metadata_uq_names:
+            if _uq_constraint_sig(uqs_dupe_indexes[overlap]).sig \
+                    not in unnamed_metadata_uqs:
+
+                conn_unique_constraints.discard(uqs_dupe_indexes[overlap])
+        elif overlap not in metadata_ix_names:
+            conn_indexes.discard(conn_ix_names[overlap])
+
+
 @comparators.dispatch_for("column")
 def _compare_nullable(
     autogen_context, alter_column_op, schema, tname, cname, conn_col,
@@ -601,6 +672,19 @@ def _compare_nullable(
                  tname,
                  cname
                  )
+
+
+@comparators.dispatch_for("column")
+def _setup_autoincrement(
+    autogen_context, alter_column_op, schema, tname, cname, conn_col,
+        metadata_col):
+
+    if metadata_col.table._autoincrement_column is metadata_col:
+        alter_column_op.kw['autoincrement'] = True
+    elif util.sqla_110 and metadata_col.autoincrement is True:
+        alter_column_op.kw['autoincrement'] = True
+    elif metadata_col.autoincrement is False:
+        alter_column_op.kw['autoincrement'] = False
 
 
 @comparators.dispatch_for("column")

@@ -640,7 +640,7 @@ class PGUniqueIndexTest(AutogenerateUniqueIndexTest):
         eq_(diffs[0][1].name, "uq_name")
         eq_(len(diffs), 1)
 
-    def test_functional_ix(self):
+    def test_functional_ix_one(self):
         m1 = MetaData()
         m2 = MetaData()
 
@@ -665,6 +665,37 @@ class PGUniqueIndexTest(AutogenerateUniqueIndexTest):
             diffs = self._fixture(m1, m2)
         eq_(diffs, [])
 
+    def test_functional_ix_two(self):
+        m1 = MetaData()
+        m2 = MetaData()
+
+        t1 = Table(
+            'foo', m1,
+            Column('id', Integer, primary_key=True),
+            Column('email', String(50)),
+            Column('name', String(50))
+        )
+        Index(
+            "email_idx",
+            func.coalesce(t1.c.email, t1.c.name).desc(), unique=True)
+
+        t2 = Table(
+            'foo', m2,
+            Column('id', Integer, primary_key=True),
+            Column('email', String(50)),
+            Column('name', String(50))
+        )
+        Index(
+            "email_idx",
+            func.coalesce(t2.c.email, t2.c.name).desc(), unique=True)
+
+        with assertions.expect_warnings(
+                "Skipped unsupported reflection",
+                "autogenerate skipping functional index"
+        ):
+            diffs = self._fixture(m1, m2)
+        eq_(diffs, [])
+
 
 class MySQLUniqueIndexTest(AutogenerateUniqueIndexTest):
     reports_unnamed_constraints = True
@@ -679,6 +710,12 @@ class MySQLUniqueIndexTest(AutogenerateUniqueIndexTest):
             assert True
         else:
             assert False, "unexpected success"
+
+
+class OracleUniqueIndexTest(AutogenerateUniqueIndexTest):
+    reports_unnamed_constraints = True
+    reports_unique_constraints_as_indexes = True
+    __only_on__ = "oracle"
 
 
 class NoUqReflectionIndexTest(NoUqReflection, AutogenerateUniqueIndexTest):
@@ -942,3 +979,27 @@ class IncludeHooksTest(AutogenFixtureTest, TestBase):
         eq_(diffs[1][0], 'add_constraint')
         eq_(diffs[1][1].name, 'uq2')
         eq_(len(diffs), 2)
+
+
+class TruncatedIdxTest(AutogenFixtureTest, TestBase):
+    __requires__ = ('sqlalchemy_09', )
+
+    def setUp(self):
+        self.bind = engines.testing_engine()
+        self.bind.dialect.max_identifier_length = 30
+
+    def test_idx_matches_long(self):
+        from alembic.operations.base import conv
+
+        m1 = MetaData()
+        Table(
+            'q', m1,
+            Column('id', Integer, primary_key=True),
+            Column('data', Integer),
+            Index(
+                conv("idx_q_table_this_is_more_than_thirty_characters"),
+                "data")
+        )
+
+        diffs = self._fixture(m1, m1)
+        eq_(diffs, [])
