@@ -4,7 +4,7 @@ Upstream-Contact: Mike Bayer
 Source: https://pypi.python.org/pypi/alembic
 
 Files: *
-Copyright: 2009-2016, Michael Bayer
+Copyright: 2009-2017, Michael Bayer
 License: MIT
 
 Files: alembic/testing/config.py

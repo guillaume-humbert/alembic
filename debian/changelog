@@ -1,6 +1,7 @@
 alembic (0.9.3-1) experimental; urgency=medium
 
   * New upstream release
+  * d/copyright: Bump upstream copyright year
   * d/watch: Use Bitbucket GIT repository
   * d/p/0002-Fix-test-for-Python-3.6.patch: Removed, applied upstream
   * Add python{3,}-dateutil to B-D
