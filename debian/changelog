@@ -1,4 +1,4 @@
-alembic (0.8.8-3) UNRELEASED; urgency=medium
+alembic (0.8.8-3) unstable; urgency=medium
 
   * Maintainer: DPMT team
   * Vcs-* move to DPMT
@@ -14,7 +14,7 @@ alembic (0.8.8-3) UNRELEASED; urgency=medium
   * Use autopkgtest-pkg-python testsuite and test alembic CLI
   * Refresh manpage
 
- -- Ondřej Nový <onovy@debian.org>  Sat, 05 Aug 2017 15:39:21 +0200
+ -- Ondřej Nový <onovy@debian.org>  Sat, 05 Aug 2017 18:57:50 +0200
 
 alembic (0.8.8-2) unstable; urgency=medium
 
