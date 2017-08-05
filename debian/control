@@ -30,10 +30,12 @@ Homepage: https://bitbucket.org/zzzeek/alembic
 
 Package: alembic
 Architecture: all
-Depends: python-alembic | python3-alembic,
+Depends: python3-alembic (=${binary:Version}),
          ${misc:Depends},
          ${python:Depends},
          ${sphinxdoc:Depends},
+Breaks: python-alembic (<< 0.8.8-3), python3-alembic (<< 0.8.8-3),
+Replaces: python-alembic (<< 0.8.8-3), python3-alembic (<< 0.8.8-3),
 Description: lightweight database migration tool for SQLAlchemy
  Alembic is a new database migration tool, written by the author
  of SQLAlchemy. A migration tool offers the following functionality:
@@ -56,7 +58,7 @@ Architecture: all
 Depends: python-pkg-resources,
          ${misc:Depends},
          ${python:Depends},
-Breaks: alembic (<< 0.6.3+ds-2),
+Breaks: alembic (<< 0.8.8-3),
 Replaces: alembic (<< 0.6.3+ds-2),
 Description: lightweight database migration tool for SQLAlchemy - Python 2.x
  Alembic is a new database migration tool, written by the author
@@ -79,6 +81,7 @@ Depends: python3-pkg-resources,
          ${misc:Depends},
          ${python3:Depends},
          ${sphinxdoc:Depends},
+Breaks: alembic (<< 0.8.8-3),
 Description: lightweight database migration tool for SQLAlchemy - Python 3.x
  Alembic is a new database migration tool, written by the author
  of SQLAlchemy. A migration tool offers the following functionality:

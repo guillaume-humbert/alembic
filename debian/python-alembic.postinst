@@ -3,7 +3,7 @@
 set -e
 
 if [ "$1" = "configure" ] ; then
-	update-alternatives --install /usr/bin/alembic alembic /usr/bin/python2-alembic 300
+	update-alternatives --quiet --remove alembic /usr/bin/python2-alembic
 fi
 
 #DEBHELPER#

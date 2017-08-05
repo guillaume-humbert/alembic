@@ -9,6 +9,7 @@ alembic (0.8.8-3) UNRELEASED; urgency=medium
   * Use pybuild
   * Remove openstack-pkg-tools from B-D, not needed anymore
   * Fix FTBFS with Python 3.6 (Closes: #868972)
+  * Remove alternatives for alembic CLI and always use Python 3 version
 
  -- Ondřej Nový <onovy@debian.org>  Sat, 05 Aug 2017 15:39:21 +0200
 
