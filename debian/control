@@ -25,8 +25,8 @@ Build-Depends-Indep: python-editor,
                      python3-pytest,
                      python3-sqlalchemy (>= 1.0),
 Standards-Version: 3.9.8
-Vcs-Browser: https://git.openstack.org/cgit/openstack/deb-alembic
-Vcs-Git: https://git.openstack.org/openstack/deb-alembic -b debian/newton
+Vcs-Browser: https://anonscm.debian.org/cgit/python-modules/packages/alembic.git/
+Vcs-Git: https://anonscm.debian.org/git/python-modules/packages/alembic.git
 Homepage: https://bitbucket.org/zzzeek/alembic
 
 Package: alembic
