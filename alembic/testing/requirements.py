@@ -19,10 +19,25 @@ class SuiteRequirements(Requirements):
 
     @property
     def unique_constraint_reflection(self):
+        def doesnt_have_check_uq_constraints(config):
+            if not util.sqla_084:
+                return True
+            from sqlalchemy import inspect
+            insp = inspect(config.db)
+            try:
+                insp.get_unique_constraints('x')
+            except NotImplementedError:
+                return True
+            except TypeError:
+                return True
+            except Exception:
+                pass
+            return False
+
         return exclusions.skip_if(
             lambda config: not util.sqla_084,
             "SQLAlchemy 0.8.4 or greater required"
-        )
+        ) + exclusions.skip_if(doesnt_have_check_uq_constraints)
 
     @property
     def foreign_key_match(self):
@@ -82,10 +97,31 @@ class SuiteRequirements(Requirements):
         )
 
     @property
+    def fail_before_sqla_100(self):
+        return exclusions.fails_if(
+            lambda config: not util.sqla_100,
+            "SQLAlchemy 1.0.0 or greater required"
+        )
+
+    @property
+    def fail_before_sqla_1010(self):
+        return exclusions.fails_if(
+            lambda config: not util.sqla_1010,
+            "SQLAlchemy 1.0.10 or greater required"
+        )
+
+    @property
     def fail_before_sqla_099(self):
         return exclusions.fails_if(
             lambda config: not util.sqla_099,
             "SQLAlchemy 0.9.9 or greater required"
+        )
+
+    @property
+    def fail_before_sqla_110(self):
+        return exclusions.fails_if(
+            lambda config: not util.sqla_110,
+            "SQLAlchemy 1.1.0 or greater required"
         )
 
     @property
@@ -115,6 +151,13 @@ class SuiteRequirements(Requirements):
         return exclusions.skip_if(
             lambda config: not util.sqla_094,
             "SQLAlchemy 0.9.4 or greater required"
+        )
+
+    @property
+    def sqlalchemy_1014(self):
+        return exclusions.skip_if(
+            lambda config: not util.sqla_1014,
+            "SQLAlchemy 1.0.14 or greater required"
         )
 
     @property

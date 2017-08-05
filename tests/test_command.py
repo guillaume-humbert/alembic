@@ -1,14 +1,16 @@
 from alembic import command
 from io import TextIOWrapper, BytesIO
 from alembic.script import ScriptDirectory
+from alembic import config
 from alembic.testing.fixtures import TestBase, capture_context_buffer
 from alembic.testing.env import staging_env, _sqlite_testing_config, \
     three_rev_fixture, clear_staging_env, _no_sql_testing_config, \
     _sqlite_file_db, write_script, env_file_fixture
-from alembic.testing import eq_, assert_raises_message, mock
+from alembic.testing import eq_, assert_raises_message, mock, assert_raises
 from alembic import util
 from contextlib import contextmanager
 import re
+from sqlalchemy import exc as sqla_exc
 
 
 class _BufMixin(object):
@@ -163,7 +165,7 @@ class RevisionTest(TestBase):
     def tearDown(self):
         clear_staging_env()
 
-    def _env_fixture(self):
+    def _env_fixture(self, version_table_pk=True):
         env_file_fixture("""
 
 from sqlalchemy import MetaData, engine_from_config
@@ -175,7 +177,10 @@ engine = engine_from_config(
 
 connection = engine.connect()
 
-context.configure(connection=connection, target_metadata=target_metadata)
+context.configure(
+    connection=connection, target_metadata=target_metadata,
+    version_table_pk=%r
+)
 
 try:
     with context.begin_transaction():
@@ -183,7 +188,7 @@ try:
 finally:
     connection.close()
 
-""")
+""" % (version_table_pk, ))
 
     def test_create_rev_plain_db_not_up_to_date(self):
         self._env_fixture()
@@ -249,8 +254,20 @@ finally:
             command.revision, self.cfg, autogenerate=True
         )
 
-    def test_err_correctly_raised_on_dupe_rows(self):
+    def test_pk_constraint_normally_prevents_dupe_rows(self):
         self._env_fixture()
+        command.revision(self.cfg)
+        r2 = command.revision(self.cfg)
+        db = _sqlite_file_db()
+        command.upgrade(self.cfg, "head")
+        assert_raises(
+            sqla_exc.IntegrityError,
+            db.execute,
+            "insert into alembic_version values ('%s')" % r2.revision
+        )
+
+    def test_err_correctly_raised_on_dupe_rows_no_pk(self):
+        self._env_fixture(version_table_pk=False)
         command.revision(self.cfg)
         r2 = command.revision(self.cfg)
         db = _sqlite_file_db()
@@ -434,6 +451,24 @@ class UpgradeDowngradeStampTest(TestBase):
         assert "DROP STEP 2" in buf.getvalue()
         assert "DROP STEP 1" not in buf.getvalue()
 
+    def test_none_to_head_sql(self):
+        with capture_context_buffer() as buf:
+            command.upgrade(self.cfg, "head", sql=True)
+        assert "CREATE TABLE alembic_version" in buf.getvalue()
+        assert "UPDATE alembic_version" in buf.getvalue()
+        assert "CREATE STEP 1" in buf.getvalue()
+        assert "CREATE STEP 2" in buf.getvalue()
+        assert "CREATE STEP 3" in buf.getvalue()
+
+    def test_base_to_head_sql(self):
+        with capture_context_buffer() as buf:
+            command.upgrade(self.cfg, "base:head", sql=True)
+        assert "CREATE TABLE alembic_version" in buf.getvalue()
+        assert "UPDATE alembic_version" in buf.getvalue()
+        assert "CREATE STEP 1" in buf.getvalue()
+        assert "CREATE STEP 2" in buf.getvalue()
+        assert "CREATE STEP 3" in buf.getvalue()
+
     def test_sql_stamp_from_rev(self):
         with capture_context_buffer() as buf:
             command.stamp(self.cfg, "%s:head" % self.a, sql=True)
@@ -569,3 +604,45 @@ class EditTest(TestBase):
         with mock.patch('alembic.util.edit') as edit:
             command.edit(self.cfg, "current")
             edit.assert_called_with(expected_call_arg)
+
+
+class CommandLineTest(TestBase):
+    @classmethod
+    def setup_class(cls):
+        cls.env = staging_env()
+        cls.cfg = _sqlite_testing_config()
+        cls.a, cls.b, cls.c = three_rev_fixture(cls.cfg)
+
+    def test_run_cmd_args_missing(self):
+        canary = mock.Mock()
+
+        orig_revision = command.revision
+
+        # the command function has "process_revision_directives"
+        # however the ArgumentParser does not.  ensure things work
+        def revision(
+            config, message=None, autogenerate=False, sql=False,
+            head="head", splice=False, branch_label=None,
+            version_path=None, rev_id=None, depends_on=None,
+            process_revision_directives=None
+        ):
+            canary(
+                config, message=message
+            )
+
+        revision.__module__ = 'alembic.command'
+
+        # CommandLine() pulls the function into the ArgumentParser
+        # and needs the full signature, so we can't patch the "revision"
+        # command normally as ArgumentParser gives us no way to get to it.
+        config.command.revision = revision
+        try:
+            commandline = config.CommandLine()
+            options = commandline.parser.parse_args(["revision", "-m", "foo"])
+            commandline.run_cmd(self.cfg, options)
+        finally:
+            config.command.revision = orig_revision
+        eq_(
+            canary.mock_calls,
+            [mock.call(self.cfg, message="foo")]
+        )

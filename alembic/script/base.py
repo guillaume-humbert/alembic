@@ -1,4 +1,5 @@
 import datetime
+from dateutil import tz
 import os
 import re
 import shutil
@@ -9,8 +10,8 @@ from ..runtime import migration
 
 from contextlib import contextmanager
 
-_sourceless_rev_file = re.compile(r'(?!__init__)(.*\.py)(c|o)?$')
-_only_source_rev_file = re.compile(r'(?!__init__)(.*\.py)$')
+_sourceless_rev_file = re.compile(r'(?!\.\#|__init__)(.*\.py)(c|o)?$')
+_only_source_rev_file = re.compile(r'(?!\.\#|__init__)(.*\.py)$')
 _legacy_rev = re.compile(r'([a-f0-9]+)\.py$')
 _mod_def_re = re.compile(r'(upgrade|downgrade)_([a-z0-9]+)')
 _slug_re = re.compile(r'\w+')
@@ -42,7 +43,8 @@ class ScriptDirectory(object):
     def __init__(self, dir, file_template=_default_file_template,
                  truncate_slug_length=40,
                  version_locations=None,
-                 sourceless=False, output_encoding="utf-8"):
+                 sourceless=False, output_encoding="utf-8",
+                 timezone=None):
         self.dir = dir
         self.file_template = file_template
         self.version_locations = version_locations
@@ -50,6 +52,7 @@ class ScriptDirectory(object):
         self.sourceless = sourceless
         self.output_encoding = output_encoding
         self.revision_map = revision.RevisionMap(self._load_revisions)
+        self.timezone = timezone
 
         if not os.access(dir, os.F_OK):
             raise util.CommandError("Path doesn't exist: %r.  Please use "
@@ -82,8 +85,17 @@ class ScriptDirectory(object):
         else:
             paths = [self.versions]
 
+        dupes = set()
         for vers in paths:
             for file_ in os.listdir(vers):
+                path = os.path.realpath(os.path.join(vers, file_))
+                if path in dupes:
+                    util.warn(
+                        "File %s loaded twice! ignoring. Please ensure "
+                        "version_locations is unique." % path
+                    )
+                    continue
+                dupes.add(path)
                 script = Script._from_filename(self, vers, file_)
                 if script is None:
                     continue
@@ -109,6 +121,7 @@ class ScriptDirectory(object):
         version_locations = config.get_main_option("version_locations")
         if version_locations:
             version_locations = _split_on_space_comma.split(version_locations)
+
         return ScriptDirectory(
             util.coerce_resource_to_filename(script_location),
             file_template=config.get_main_option(
@@ -117,7 +130,8 @@ class ScriptDirectory(object):
             truncate_slug_length=truncate_slug_length,
             sourceless=config.get_main_option("sourceless") == "true",
             output_encoding=config.get_main_option("output_encoding", "utf-8"),
-            version_locations=version_locations
+            version_locations=version_locations,
+            timezone=config.get_main_option("timezone")
         )
 
     @contextmanager
@@ -356,7 +370,8 @@ class ScriptDirectory(object):
                     # dest is 'base'.  Return a "delete branch" migration
                     # for all applicable heads.
                     steps.extend([
-                        migration.StampStep(head.revision, None, False, True)
+                        migration.StampStep(head.revision, None, False, True,
+                                            self.revision_map)
                         for head in filtered_heads
                     ])
                     continue
@@ -376,7 +391,8 @@ class ScriptDirectory(object):
                     assert not ancestors.intersection(filtered_heads)
                     todo_heads = [head.revision for head in filtered_heads]
                     step = migration.StampStep(
-                        todo_heads, dest.revision, False, False)
+                        todo_heads, dest.revision, False, False,
+                        self.revision_map)
                     steps.append(step)
                     continue
                 elif ancestors.intersection(filtered_heads):
@@ -384,13 +400,15 @@ class ScriptDirectory(object):
                     # we can treat them as a "merge", single step.
                     todo_heads = [head.revision for head in filtered_heads]
                     step = migration.StampStep(
-                        todo_heads, dest.revision, True, False)
+                        todo_heads, dest.revision, True, False,
+                        self.revision_map)
                     steps.append(step)
                     continue
                 else:
                     # destination is in a branch not represented,
                     # treat it as new branch
-                    step = migration.StampStep((), dest.revision, True, True)
+                    step = migration.StampStep((), dest.revision, True, True,
+                                               self.revision_map)
                     steps.append(step)
                     continue
             return steps
@@ -431,6 +449,18 @@ class ScriptDirectory(object):
                 "Creating directory %s" % path,
                 os.makedirs, path)
 
+    def _generate_create_date(self):
+        if self.timezone is not None:
+            tzinfo = tz.gettz(self.timezone.upper())
+            if tzinfo is None:
+                raise util.CommandError(
+                    "Can't locate timezone: %s" % self.timezone)
+            create_date = datetime.datetime.utcnow().replace(
+                tzinfo=tz.tzutc()).astimezone(tzinfo)
+        else:
+            create_date = datetime.datetime.now()
+        return create_date
+
     def generate_revision(
             self, revid, message, head=None,
             refresh=False, splice=False, branch_labels=None,
@@ -469,7 +499,7 @@ class ScriptDirectory(object):
         if len(set(heads)) != len(heads):
             raise util.CommandError("Duplicate head revisions specified")
 
-        create_date = datetime.datetime.now()
+        create_date = self._generate_create_date()
 
         if version_path is None:
             if len(self._version_locations) > 1:

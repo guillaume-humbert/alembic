@@ -1,7 +1,7 @@
 
 from sqlalchemy import DateTime, MetaData, Table, Column, text, Integer, \
     String, Interval, Sequence, Numeric, BigInteger, Float, Numeric
-from sqlalchemy.dialects.postgresql import ARRAY, UUID
+from sqlalchemy.dialects.postgresql import ARRAY, UUID, BYTEA
 from sqlalchemy.engine.reflection import Inspector
 from alembic.operations import Operations
 from sqlalchemy.sql import table, column
@@ -22,6 +22,16 @@ from alembic.testing.fixtures import TestBase
 from alembic.testing.fixtures import op_fixture
 from alembic.testing import config
 from alembic import op
+from alembic.util import compat
+from alembic.testing import eq_ignore_whitespace
+from alembic import autogenerate
+from sqlalchemy import Index
+from sqlalchemy import Boolean
+from sqlalchemy.sql import false
+
+
+if util.sqla_09:
+    from sqlalchemy.dialects.postgresql import JSON, JSONB
 
 
 class PostgresqlOpTest(TestBase):
@@ -66,6 +76,45 @@ class PostgresqlOpTest(TestBase):
             'ALTER TABLE t ALTER COLUMN c TYPE INTEGER USING c::integer'
         )
 
+    def test_col_w_pk_is_serial(self):
+        context = op_fixture("postgresql")
+        op.add_column("some_table", Column('q', Integer, primary_key=True))
+        context.assert_(
+            'ALTER TABLE some_table ADD COLUMN q SERIAL NOT NULL'
+        )
+
+    @config.requirements.fail_before_sqla_100
+    def test_create_exclude_constraint(self):
+        context = op_fixture("postgresql")
+        op.create_exclude_constraint(
+            "ex1", "t1", ('x', '>'), where='x > 5', using="gist")
+        context.assert_(
+            "ALTER TABLE t1 ADD CONSTRAINT ex1 EXCLUDE USING gist (x WITH >) "
+            "WHERE (x > 5)"
+        )
+
+    @config.requirements.fail_before_sqla_100
+    def test_create_exclude_constraint_quoted_literal(self):
+        context = op_fixture("postgresql")
+        op.create_exclude_constraint(
+            "ex1", "SomeTable", ('"SomeColumn"', '>'),
+            where='"SomeColumn" > 5', using="gist")
+        context.assert_(
+            'ALTER TABLE "SomeTable" ADD CONSTRAINT ex1 EXCLUDE USING gist '
+            '("SomeColumn" WITH >) WHERE ("SomeColumn" > 5)'
+        )
+
+    @config.requirements.fail_before_sqla_1010
+    def test_create_exclude_constraint_quoted_column(self):
+        context = op_fixture("postgresql")
+        op.create_exclude_constraint(
+            "ex1", "SomeTable", (column("SomeColumn"), '>'),
+            where=column("SomeColumn") > 5, using="gist")
+        context.assert_(
+            'ALTER TABLE "SomeTable" ADD CONSTRAINT ex1 EXCLUDE '
+            'USING gist ("SomeColumn" WITH >) WHERE ("SomeColumn" > 5)'
+        )
+
 
 class PGOfflineEnumTest(TestBase):
 
@@ -90,10 +139,12 @@ from alembic import op
 from sqlalchemy.dialects.postgresql import ENUM
 from sqlalchemy import Column
 
+
 def upgrade():
     op.create_table("sometable",
         Column("data", ENUM("one", "two", "three", name="pgenum"))
     )
+
 
 def downgrade():
     op.drop_table("sometable")
@@ -108,12 +159,14 @@ from alembic import op
 from sqlalchemy.dialects.postgresql import ENUM
 from sqlalchemy import Column
 
+
 def upgrade():
     enum = ENUM("one", "two", "three", name="pgenum", create_type=False)
     enum.create(op.get_bind(), checkfirst=False)
     op.create_table("sometable",
         Column("data", enum)
     )
+
 
 def downgrade():
     op.drop_table("sometable")
@@ -464,6 +517,8 @@ class PostgresqlDetectSerialTest(TestBase):
     def _expect_default(self, c_expected, col, seq=None):
         Table('t', self.metadata, col)
 
+        self.autogen_context.metadata = self.metadata
+
         if seq:
             seq._set_metadata(self.metadata)
         self.metadata.create_all(config.db)
@@ -473,7 +528,7 @@ class PostgresqlDetectSerialTest(TestBase):
         uo = ops.UpgradeOps(ops=[])
         _compare_tables(
             set([(None, 't')]), set([]),
-            insp, self.metadata, uo, self.autogen_context)
+            insp, uo, self.autogen_context)
         diffs = uo.as_diffs()
         tab = diffs[0][1]
 
@@ -485,9 +540,10 @@ class PostgresqlDetectSerialTest(TestBase):
         uo = ops.UpgradeOps(ops=[])
         m2 = MetaData()
         Table('t', m2, Column('x', BigInteger()))
+        self.autogen_context.metadata = m2
         _compare_tables(
             set([(None, 't')]), set([(None, 't')]),
-            insp, m2, uo, self.autogen_context)
+            insp, uo, self.autogen_context)
         diffs = uo.as_diffs()
         server_default = diffs[0][0][4]['existing_server_default']
         eq_(_render_server_default_for_compare(
@@ -525,3 +581,191 @@ class PostgresqlDetectSerialTest(TestBase):
             None,
             Column('x', Integer, autoincrement=False, primary_key=True)
         )
+
+
+class PostgresqlAutogenRenderTest(TestBase):
+
+    def setUp(self):
+        ctx_opts = {
+            'sqlalchemy_module_prefix': 'sa.',
+            'alembic_module_prefix': 'op.',
+            'target_metadata': MetaData()
+        }
+        context = MigrationContext.configure(
+            dialect_name="postgresql",
+            opts=ctx_opts
+        )
+
+        self.autogen_context = api.AutogenContext(context)
+
+    def test_render_add_index_pg_where(self):
+        autogen_context = self.autogen_context
+
+        m = MetaData()
+        t = Table('t', m,
+                  Column('x', String),
+                  Column('y', String)
+                  )
+
+        idx = Index('foo_idx', t.c.x, t.c.y,
+                    postgresql_where=(t.c.y == 'something'))
+
+        op_obj = ops.CreateIndexOp.from_index(idx)
+
+        if util.sqla_08:
+            eq_ignore_whitespace(
+                autogenerate.render_op_text(autogen_context, op_obj),
+                """op.create_index('foo_idx', 't', \
+['x', 'y'], unique=False, """
+                """postgresql_where=sa.text(!U"y = 'something'"))"""
+            )
+        else:
+            eq_ignore_whitespace(
+                autogenerate.render_op_text(autogen_context, op_obj),
+                """op.create_index('foo_idx', 't', ['x', 'y'], \
+unique=False, """
+                """postgresql_where=sa.text(!U't.y = %(y_1)s'))"""
+            )
+
+    def test_render_server_default_native_boolean(self):
+        c = Column(
+            'updated_at', Boolean(),
+            server_default=false(),
+            nullable=False)
+        result = autogenerate.render._render_column(
+            c, self.autogen_context,
+        )
+        eq_ignore_whitespace(
+            result,
+            'sa.Column(\'updated_at\', sa.Boolean(), '
+            'server_default=sa.text(!U\'false\'), '
+            'nullable=False)'
+        )
+
+    @config.requirements.sqlalchemy_09
+    def test_array_type(self):
+
+        eq_ignore_whitespace(
+            autogenerate.render._repr_type(
+                ARRAY(Integer), self.autogen_context),
+            "postgresql.ARRAY(sa.Integer())"
+        )
+
+        eq_ignore_whitespace(
+            autogenerate.render._repr_type(
+                ARRAY(DateTime(timezone=True)), self.autogen_context),
+            "postgresql.ARRAY(sa.DateTime(timezone=True))"
+        )
+
+        eq_ignore_whitespace(
+            autogenerate.render._repr_type(
+                ARRAY(BYTEA, as_tuple=True, dimensions=2),
+                self.autogen_context),
+            "postgresql.ARRAY(postgresql.BYTEA(), as_tuple=True, dimensions=2)"
+        )
+
+        assert 'from sqlalchemy.dialects import postgresql' in \
+            self.autogen_context.imports
+
+    @config.requirements.sqlalchemy_09
+    def test_array_type_user_defined_inner(self):
+        def repr_type(typestring, object_, autogen_context):
+            if typestring == 'type' and isinstance(object_, String):
+                return "foobar.MYVARCHAR"
+            else:
+                return False
+
+        self.autogen_context.opts.update(
+            render_item=repr_type
+        )
+
+        eq_ignore_whitespace(
+            autogenerate.render._repr_type(
+                ARRAY(String), self.autogen_context),
+            "postgresql.ARRAY(foobar.MYVARCHAR)"
+        )
+
+    @config.requirements.fail_before_sqla_100
+    def test_add_exclude_constraint(self):
+        from sqlalchemy.dialects.postgresql import ExcludeConstraint
+
+        autogen_context = self.autogen_context
+
+        m = MetaData()
+        t = Table('t', m,
+                  Column('x', String),
+                  Column('y', String)
+                  )
+
+        op_obj = ops.AddConstraintOp.from_constraint(ExcludeConstraint(
+            (t.c.x, ">"),
+            where=t.c.x != 2,
+            using="gist",
+            name="t_excl_x"
+        ))
+
+        eq_ignore_whitespace(
+            autogenerate.render_op_text(autogen_context, op_obj),
+            "op.create_exclude_constraint('t_excl_x', 't', ('x', '>'), "
+            "where=sa.text(!U'x != 2'), using='gist')"
+        )
+
+    @config.requirements.fail_before_sqla_100
+    def test_inline_exclude_constraint(self):
+        from sqlalchemy.dialects.postgresql import ExcludeConstraint
+
+        autogen_context = self.autogen_context
+
+        m = MetaData()
+        t = Table(
+            't', m,
+            Column('x', String),
+            Column('y', String),
+            ExcludeConstraint(
+                ('x', ">"),
+                using="gist",
+                where='x != 2',
+                name="t_excl_x"
+            )
+        )
+
+        op_obj = ops.CreateTableOp.from_table(t)
+
+        eq_ignore_whitespace(
+            autogenerate.render_op_text(autogen_context, op_obj),
+            "op.create_table('t',sa.Column('x', sa.String(), nullable=True),"
+            "sa.Column('y', sa.String(), nullable=True),"
+            "postgresql.ExcludeConstraint((!U'x', '>'), "
+            "where=sa.text(!U'x != 2'), using='gist', name='t_excl_x')"
+            ")"
+        )
+
+    @config.requirements.sqlalchemy_09
+    def test_json_type(self):
+        if config.requirements.sqlalchemy_110.enabled:
+            eq_ignore_whitespace(
+                autogenerate.render._repr_type(
+                    JSON(), self.autogen_context),
+                "postgresql.JSON(astext_type=sa.Text())"
+            )
+        else:
+            eq_ignore_whitespace(
+                autogenerate.render._repr_type(
+                    JSON(), self.autogen_context),
+                "postgresql.JSON()"
+            )
+
+    @config.requirements.sqlalchemy_09
+    def test_jsonb_type(self):
+        if config.requirements.sqlalchemy_110.enabled:
+            eq_ignore_whitespace(
+                autogenerate.render._repr_type(
+                    JSONB(), self.autogen_context),
+                "postgresql.JSONB(astext_type=sa.Text())"
+            )
+        else:
+            eq_ignore_whitespace(
+                autogenerate.render._repr_type(
+                    JSONB(), self.autogen_context),
+                "postgresql.JSONB()"
+            )

@@ -2,16 +2,19 @@
 
 import os
 import re
+import textwrap
 
 from alembic import command, util
 from alembic.util import compat
 from alembic.script import ScriptDirectory, Script
 from alembic.testing.env import clear_staging_env, staging_env, \
     _sqlite_testing_config, write_script, _sqlite_file_db, \
-    three_rev_fixture, _no_sql_testing_config
+    three_rev_fixture, _no_sql_testing_config, env_file_fixture
 from alembic.testing import eq_, assert_raises_message
 from alembic.testing.fixtures import TestBase, capture_context_buffer
-
+from alembic.environment import EnvironmentContext
+from contextlib import contextmanager
+from alembic.testing import mock
 
 class ApplyVersionsFunctionalTest(TestBase):
     __only_on__ = 'sqlite'
@@ -47,8 +50,10 @@ class ApplyVersionsFunctionalTest(TestBase):
 
     from alembic import op
 
+
     def upgrade():
         op.execute("CREATE TABLE foo(id integer)")
+
 
     def downgrade():
         op.execute("DROP TABLE foo")
@@ -62,8 +67,10 @@ class ApplyVersionsFunctionalTest(TestBase):
 
     from alembic import op
 
+
     def upgrade():
         op.execute("CREATE TABLE bar(id integer)")
+
 
     def downgrade():
         op.execute("DROP TABLE bar")
@@ -77,8 +84,10 @@ class ApplyVersionsFunctionalTest(TestBase):
 
     from alembic import op
 
+
     def upgrade():
         op.execute("CREATE TABLE bat(id integer)")
+
 
     def downgrade():
         op.execute("DROP TABLE bat")
@@ -125,7 +134,88 @@ class SourcelessApplyVersionsTest(ApplyVersionsFunctionalTest):
     sourceless = True
 
 
-class TransactionalDDLTest(TestBase):
+class CallbackEnvironmentTest(ApplyVersionsFunctionalTest):
+    exp_kwargs = frozenset(('ctx', 'heads', 'run_args', 'step'))
+
+    @staticmethod
+    def _env_file_fixture():
+        env_file_fixture(textwrap.dedent("""\
+            import alembic
+            from alembic import context
+            from sqlalchemy import engine_from_config, pool
+
+            config = context.config
+
+            target_metadata = None
+
+            def run_migrations_offline():
+                url = config.get_main_option('sqlalchemy.url')
+                context.configure(
+                    url=url, target_metadata=target_metadata,
+                    on_version_apply=alembic.mock_event_listener,
+                    literal_binds=True)
+
+                with context.begin_transaction():
+                    context.run_migrations()
+
+            def run_migrations_online():
+                connectable = engine_from_config(
+                    config.get_section(config.config_ini_section),
+                    prefix='sqlalchemy.',
+                    poolclass=pool.NullPool)
+                with connectable.connect() as connection:
+                    context.configure(
+                        connection=connection,
+                        on_version_apply=alembic.mock_event_listener,
+                        target_metadata=target_metadata,
+                    )
+                    with context.begin_transaction():
+                        context.run_migrations()
+
+            if context.is_offline_mode():
+                run_migrations_offline()
+            else:
+                run_migrations_online()
+            """))
+
+    def test_steps(self):
+        import alembic
+        alembic.mock_event_listener = None
+        self._env_file_fixture()
+        with mock.patch('alembic.mock_event_listener', mock.Mock()) as mymock:
+            super(CallbackEnvironmentTest, self).test_steps()
+        calls = mymock.call_args_list
+        assert calls
+        for call in calls:
+            args, kw = call
+            assert not args
+            assert set(kw.keys()) >= self.exp_kwargs
+            assert kw['run_args'] == {}
+            assert hasattr(kw['ctx'], 'get_current_revision')
+
+            step = kw['step']
+            assert isinstance(getattr(step, 'is_upgrade', None), bool)
+            assert isinstance(getattr(step, 'is_stamp', None), bool)
+            assert isinstance(getattr(step, 'is_migration', None), bool)
+            assert isinstance(getattr(step, 'up_revision_id', None),
+                              compat.string_types)
+            assert isinstance(getattr(step, 'up_revision', None), Script)
+            for revtype in 'down', 'source', 'destination':
+                revs = getattr(step, '%s_revisions' % revtype)
+                assert isinstance(revs, tuple)
+                for rev in revs:
+                    assert isinstance(rev, Script)
+                revids = getattr(step, '%s_revision_ids' % revtype)
+                for revid in revids:
+                    assert isinstance(revid, compat.string_types)
+
+            heads = kw['heads']
+            assert hasattr(heads, '__iter__')
+            for h in heads:
+                assert h is None or isinstance(h, compat.string_types)
+
+
+class OfflineTransactionalDDLTest(TestBase):
     def setUp(self):
         self.env = staging_env()
         self.cfg = cfg = _no_sql_testing_config()
@@ -162,6 +252,145 @@ class TransactionalDDLTest(TestBase):
             (r"BEGIN;.*?%s.*?COMMIT;.*$" % self.c),
 
             buf.getvalue(), re.S)
+
+
+class OnlineTransactionalDDLTest(TestBase):
+    def tearDown(self):
+        clear_staging_env()
+
+    def _opened_transaction_fixture(self):
+        self.env = staging_env()
+        self.cfg = _sqlite_testing_config()
+
+        script = ScriptDirectory.from_config(self.cfg)
+        a = util.rev_id()
+        b = util.rev_id()
+        c = util.rev_id()
+        script.generate_revision(a, "revision a", refresh=True)
+        write_script(script, a, """
+"rev a"
+
+revision = '%s'
+down_revision = None
+
+def upgrade():
+    pass
+
+def downgrade():
+    pass
+
+""" % (a, ))
+        script.generate_revision(b, "revision b", refresh=True)
+        write_script(script, b, """
+"rev b"
+revision = '%s'
+down_revision = '%s'
+
+from alembic import op
+
+
+def upgrade():
+    conn = op.get_bind()
+    trans = conn.begin()
+
+
+def downgrade():
+    pass
+
+""" % (b, a))
+        script.generate_revision(c, "revision c", refresh=True)
+        write_script(script, c, """
+"rev c"
+revision = '%s'
+down_revision = '%s'
+
+from alembic import op
+
+
+def upgrade():
+    pass
+
+
+def downgrade():
+    pass
+
+""" % (c, b))
+        return a, b, c
+
+    @contextmanager
+    def _patch_environment(self, transactional_ddl, transaction_per_migration):
+        conf = EnvironmentContext.configure
+
+        def configure(*arg, **opt):
+            opt.update(
+                transactional_ddl=transactional_ddl,
+                transaction_per_migration=transaction_per_migration)
+            return conf(*arg, **opt)
+
+        with mock.patch.object(EnvironmentContext, "configure", configure):
+            yield
+
+    def test_raise_when_rev_leaves_open_transaction(self):
+        a, b, c = self._opened_transaction_fixture()
+
+        with self._patch_environment(
+                transactional_ddl=False, transaction_per_migration=False):
+            assert_raises_message(
+                util.CommandError,
+                r'Migration "upgrade .*, rev b" has left an uncommitted '
+                r'transaction opened; transactional_ddl is False so Alembic '
+                r'is not committing transactions',
+                command.upgrade, self.cfg, c
+            )
+
+    def test_raise_when_rev_leaves_open_transaction_tpm(self):
+        a, b, c = self._opened_transaction_fixture()
+
+        with self._patch_environment(
+                transactional_ddl=False, transaction_per_migration=True):
+            assert_raises_message(
+                util.CommandError,
+                r'Migration "upgrade .*, rev b" has left an uncommitted '
+                r'transaction opened; transactional_ddl is False so Alembic '
+                r'is not committing transactions',
+                command.upgrade, self.cfg, c
+            )
+
+    def test_noerr_rev_leaves_open_transaction_transactional_ddl(self):
+        a, b, c = self._opened_transaction_fixture()
+
+        with self._patch_environment(
+                transactional_ddl=True, transaction_per_migration=False):
+            command.upgrade(self.cfg, c)
+
+    def test_noerr_transaction_opened_externally(self):
+        a, b, c = self._opened_transaction_fixture()
+
+        env_file_fixture("""
+from sqlalchemy import engine_from_config, pool
+
+def run_migrations_online():
+    connectable = engine_from_config(
+        config.get_section(config.config_ini_section),
+        prefix='sqlalchemy.',
+        poolclass=pool.NullPool)
+
+    with connectable.connect() as connection:
+        with connection.begin() as real_trans:
+            context.configure(
+                connection=connection,
+                transactional_ddl=False,
+                transaction_per_migration=False
+            )
+
+            with context.begin_transaction():
+                context.run_migrations()
+
+run_migrations_online()
+
+""")
+
+        command.stamp(self.cfg, c)
 
 
 class EncodingTest(TestBase):
@@ -221,8 +450,10 @@ class VersionNameTemplateTest(TestBase):
 
     from alembic import op
 
+
     def upgrade():
         op.execute("CREATE TABLE foo(id integer)")
+
 
     def downgrade():
         op.execute("DROP TABLE foo")
@@ -244,8 +475,10 @@ class VersionNameTemplateTest(TestBase):
 
     from alembic import op
 
+
     def upgrade():
         op.execute("CREATE TABLE foo(id integer)")
+
 
     def downgrade():
         op.execute("DROP TABLE foo")
@@ -270,11 +503,14 @@ down_revision = None
 
 from alembic import op
 
+
 def upgrade():
     op.execute("CREATE TABLE foo(id integer)")
 
+
 def downgrade():
     op.execute("DROP TABLE foo")
+
 """)
         pyc_path = util.pyc_file_from_path(path)
         if os.access(pyc_path, os.F_OK):
@@ -288,7 +524,7 @@ def downgrade():
             Script._from_path, script, path)
 
 
-class IgnoreInitTest(TestBase):
+class IgnoreFilesTest(TestBase):
     sourceless = False
 
     def setUp(self):
@@ -299,12 +535,11 @@ class IgnoreInitTest(TestBase):
     def tearDown(self):
         clear_staging_env()
 
-    def _test_ignore_init_py(self, ext):
-        """test that __init__.py is ignored."""
+    def _test_ignore_file_py(self, fname):
 
         command.revision(self.cfg, message="some rev")
         script = ScriptDirectory.from_config(self.cfg)
-        path = os.path.join(script.versions, "__init__.%s" % ext)
+        path = os.path.join(script.versions, fname)
         with open(path, 'w') as f:
             f.write(
                 "crap, crap -> crap"
@@ -313,20 +548,42 @@ class IgnoreInitTest(TestBase):
 
         script.get_revision('head')
 
-    def test_ignore_py(self):
+    def _test_ignore_init_py(self, ext):
+        """test that __init__.py is ignored."""
+
+        self._test_ignore_file_py("__init__.%s" % ext)
+
+    def _test_ignore_dot_hash_py(self, ext):
+        """test that .#test.py is ignored."""
+
+        self._test_ignore_file_py(".#test.%s" % ext)
+
+    def test_ignore_init_py(self):
         self._test_ignore_init_py("py")
 
-    def test_ignore_pyc(self):
+    def test_ignore_init_pyc(self):
         self._test_ignore_init_py("pyc")
 
-    def test_ignore_pyx(self):
+    def test_ignore_init_pyx(self):
         self._test_ignore_init_py("pyx")
 
-    def test_ignore_pyo(self):
+    def test_ignore_init_pyo(self):
         self._test_ignore_init_py("pyo")
 
+    def test_ignore_dot_hash_py(self):
+        self._test_ignore_dot_hash_py("py")
 
-class SourcelessIgnoreInitTest(IgnoreInitTest):
+    def test_ignore_dot_hash_pyc(self):
+        self._test_ignore_dot_hash_py("pyc")
+
+    def test_ignore_dot_hash_pyx(self):
+        self._test_ignore_dot_hash_py("pyx")
+
+    def test_ignore_dot_hash_pyo(self):
+        self._test_ignore_dot_hash_py("pyo")
+
+
+class SourcelessIgnoreFilesTest(IgnoreFilesTest):
     sourceless = True
 
 
@@ -350,8 +607,10 @@ class SourcelessNeedsFlagTest(TestBase):
 
     from alembic import op
 
+
     def upgrade():
         op.execute("CREATE TABLE foo(id integer)")
+
 
     def downgrade():
         op.execute("DROP TABLE foo")
