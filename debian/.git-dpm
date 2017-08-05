@@ -6,3 +6,6 @@ f8c700289497b07721bb981fa477a987dff9477c
 alembic_0.8.8.orig.tar.xz
 80719dfebdbf428f73239bb4ccd48198e1c6a8ff
 338868
+debianTag="debian/%e%v"
+patchedTag="patched/%e%v"
+upstreamTag="upstream/%e%u"
