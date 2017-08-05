@@ -11,6 +11,7 @@ alembic (0.8.8-3) UNRELEASED; urgency=medium
   * Fix FTBFS with Python 3.6 (Closes: #868972)
   * Remove alternatives for alembic CLI and always use Python 3 version
   * d/s/options: Remove extend-diff-ignore of .gitreview
+  * Use autopkgtest-pkg-python testsuite and test alembic CLI
 
  -- Ondřej Nový <onovy@debian.org>  Sat, 05 Aug 2017 15:39:21 +0200
 

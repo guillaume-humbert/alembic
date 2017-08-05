@@ -27,6 +27,7 @@ Standards-Version: 4.0.0
 Vcs-Browser: https://anonscm.debian.org/cgit/python-modules/packages/alembic.git/
 Vcs-Git: https://anonscm.debian.org/git/python-modules/packages/alembic.git
 Homepage: https://bitbucket.org/zzzeek/alembic
+Testsuite: autopkgtest-pkg-python
 
 Package: alembic
 Architecture: all
