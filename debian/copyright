@@ -1,4 +1,4 @@
-Format: http://www.debian.org/doc/packaging-manuals/copyright-format/1.0/
+Format: https://www.debian.org/doc/packaging-manuals/copyright-format/1.0/
 Upstream-Name: alembic
 Upstream-Contact: Mike Bayer
 Source: https://pypi.python.org/pypi/alembic
@@ -25,7 +25,7 @@ Copyright: (c) 2012, Matthias Kümmerer <matthias@matthias-k.org>
            (c) 2014, Thomas Bechtold <toabctl@debian.org>
            (c) 2014, Piotr Ożarowski <piotr@debian.org>
            (c) 2013-2015, Thomas Goirand <zigo@debian.org>
-           (c) 2016, Ondřej Nový <onovy@debian.org>
+           (c) 2016-2017, Ondřej Nový <onovy@debian.org>
 License: MIT
 
 License: MIT
