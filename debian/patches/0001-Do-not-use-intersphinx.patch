@@ -1,11 +1,19 @@
-Description: Do not use intersphinx
+From f8c700289497b07721bb981fa477a987dff9477c Mon Sep 17 00:00:00 2001
+From: Thomas Goirand <zigo@debian.org>
+Date: Sat, 5 Aug 2017 15:37:41 +0200
+Subject: Do not use intersphinx
+
  Avoids network connection during build.
-Author: Thomas Goirand <zigo@debian.org>
 Forwarded: not-needed
 Last-Update: 2015-02-08
+---
+ docs/build/conf.py | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
---- alembic-0.7.4.orig/docs/build/conf.py
-+++ alembic-0.7.4/docs/build/conf.py
+diff --git a/docs/build/conf.py b/docs/build/conf.py
+index 7e9fcaf..fbfba66 100644
+--- a/docs/build/conf.py
++++ b/docs/build/conf.py
 @@ -30,7 +30,7 @@ import alembic
  
  # Add any Sphinx extension module names here, as strings. They can be extensions
