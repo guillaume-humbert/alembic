@@ -1,6 +1,8 @@
-alembic (0.8.8-4) UNRELEASED; urgency=medium
+alembic (0.9.3-1) UNRELEASED; urgency=medium
 
+  * New upstream release
   * d/watch: Use Bitbucket GIT repository
+  * d/p/0002-Fix-test-for-Python-3.6.patch: Removed, applied upstream
 
  -- Ondřej Nový <onovy@debian.org>  Sat, 05 Aug 2017 20:27:04 +0200
 
