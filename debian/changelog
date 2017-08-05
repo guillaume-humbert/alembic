@@ -1,3 +1,9 @@
+alembic (0.8.8-3) UNRELEASED; urgency=medium
+
+  * Maintainer: DPMT team
+
+ -- Ondřej Nový <onovy@debian.org>  Sat, 05 Aug 2017 15:39:21 +0200
+
 alembic (0.8.8-2) unstable; urgency=medium
 
   [ Ondřej Nový ]

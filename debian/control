@@ -1,7 +1,7 @@
 Source: alembic
 Section: python
 Priority: optional
-Maintainer: PKG OpenStack <openstack-devel@lists.alioth.debian.org>
+Maintainer: Debian Python Modules Team <python-modules-team@lists.alioth.debian.org>
 Uploaders: Thomas Goirand <zigo@debian.org>,
            Ondřej Nový <onovy@debian.org>,
 Build-Depends: debhelper (>= 10),
