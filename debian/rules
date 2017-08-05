@@ -22,5 +22,5 @@ override_dh_auto_install:
 	mv $(CURDIR)/debian/python3-alembic/usr/bin $(CURDIR)/debian/alembic/usr/
 
 help2man:
-	help2man --version-string=$(DEB_SOURCE) -n "lightweight database migration tool for usage with the SQLAlchemy" -N alembic > debian/alembic.1
+	help2man --version-string=$(DEB_VERSION_UPSTREAM) -n "lightweight database migration tool for usage with the SQLAlchemy" -N alembic > debian/alembic.1
 	sed -i "s/,\(\w\)/, \1/g" debian/alembic.1
