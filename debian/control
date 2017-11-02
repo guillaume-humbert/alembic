@@ -2,29 +2,32 @@ Source: alembic
 Section: python
 Priority: optional
 Maintainer: Debian Python Modules Team <python-modules-team@lists.alioth.debian.org>
-Uploaders: Thomas Goirand <zigo@debian.org>,
-           Ondřej Nový <onovy@debian.org>,
-Build-Depends: debhelper (>= 10),
-               dh-python,
-               python-all,
-               python-setuptools,
-               python3-all,
-               python3-changelog,
-               python3-setuptools,
-               python3-sphinx,
-               python3-sphinx-paramlinks,
-Build-Depends-Indep: python-dateutil,
-                     python-editor,
-                     python-mako,
-                     python-mock,
-                     python-pytest,
-                     python-sqlalchemy (>= 1.0),
-                     python3-dateutil,
-                     python3-editor,
-                     python3-mako,
-                     python3-mock,
-                     python3-pytest,
-                     python3-sqlalchemy (>= 1.0),
+Uploaders:
+ Thomas Goirand <zigo@debian.org>,
+ Ondřej Nový <onovy@debian.org>,
+Build-Depends:
+ debhelper (>= 10),
+ dh-python,
+ python-all,
+ python-setuptools,
+ python3-all,
+ python3-changelog,
+ python3-setuptools,
+ python3-sphinx,
+ python3-sphinx-paramlinks,
+Build-Depends-Indep:
+ python-dateutil,
+ python-editor,
+ python-mako,
+ python-mock,
+ python-pytest,
+ python-sqlalchemy (>= 1.0),
+ python3-dateutil,
+ python3-editor,
+ python3-mako,
+ python3-mock,
+ python3-pytest,
+ python3-sqlalchemy (>= 1.0),
 Standards-Version: 4.0.0
 Vcs-Browser: https://anonscm.debian.org/cgit/python-modules/packages/alembic.git/
 Vcs-Git: https://anonscm.debian.org/git/python-modules/packages/alembic.git
@@ -33,12 +36,17 @@ Testsuite: autopkgtest-pkg-python
 
 Package: alembic
 Architecture: all
-Depends: python3-alembic (=${binary:Version}),
-         ${misc:Depends},
-         ${python:Depends},
-         ${sphinxdoc:Depends},
-Breaks: python-alembic (<< 0.8.8-3), python3-alembic (<< 0.8.8-3),
-Replaces: python-alembic (<< 0.8.8-3), python3-alembic (<< 0.8.8-3),
+Depends:
+ python3-alembic (=${binary:Version}),
+ ${misc:Depends},
+ ${python:Depends},
+ ${sphinxdoc:Depends},
+Breaks:
+ python-alembic (<< 0.8.8-3),
+ python3-alembic (<< 0.8.8-3),
+Replaces:
+ python-alembic (<< 0.8.8-3),
+ python3-alembic (<< 0.8.8-3),
 Description: lightweight database migration tool for SQLAlchemy
  Alembic is a new database migration tool, written by the author
  of SQLAlchemy. A migration tool offers the following functionality:
@@ -58,11 +66,14 @@ Description: lightweight database migration tool for SQLAlchemy
 
 Package: python-alembic
 Architecture: all
-Depends: python-pkg-resources,
-         ${misc:Depends},
-         ${python:Depends},
-Breaks: alembic (<< 0.8.8-3),
-Replaces: alembic (<< 0.6.3+ds-2),
+Depends:
+ python-pkg-resources,
+ ${misc:Depends},
+ ${python:Depends},
+Breaks:
+ alembic (<< 0.8.8-3),
+Replaces:
+ alembic (<< 0.6.3+ds-2),
 Description: lightweight database migration tool for SQLAlchemy - Python 2.x
  Alembic is a new database migration tool, written by the author
  of SQLAlchemy. A migration tool offers the following functionality:
@@ -80,11 +91,13 @@ Description: lightweight database migration tool for SQLAlchemy - Python 2.x
 
 Package: python3-alembic
 Architecture: all
-Depends: python3-pkg-resources,
-         ${misc:Depends},
-         ${python3:Depends},
-         ${sphinxdoc:Depends},
-Breaks: alembic (<< 0.8.8-3),
+Depends:
+ python3-pkg-resources,
+ ${misc:Depends},
+ ${python3:Depends},
+ ${sphinxdoc:Depends},
+Breaks:
+ alembic (<< 0.8.8-3),
 Description: lightweight database migration tool for SQLAlchemy - Python 3.x
  Alembic is a new database migration tool, written by the author
  of SQLAlchemy. A migration tool offers the following functionality:
