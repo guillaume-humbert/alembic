@@ -202,7 +202,7 @@ alembic (0.6.2+ds-1) unstable; urgency=low
   [ Jackson Doak ]
   * New upstream release (closes: #734021)
   * Incorporate NMU changes
-  * debian/control: 
+  * debian/control:
     - Bump standards-version to 3.9.5
     - Add X-Python-Version
   * Add doc-base
