@@ -1,4 +1,4 @@
-From 578d49c27a01744a81224cb1d92c7c4949082747 Mon Sep 17 00:00:00 2001
+From 46910726c3aa7ad42ba1c79837733a5b50cba961 Mon Sep 17 00:00:00 2001
 From: Thomas Goirand <zigo@debian.org>
 Date: Sat, 5 Aug 2017 15:37:41 +0200
 Subject: Do not use intersphinx
@@ -11,7 +11,7 @@ Last-Update: 2015-02-08
  1 file changed, 1 insertion(+), 1 deletion(-)
 
 diff --git a/docs/build/conf.py b/docs/build/conf.py
-index 3a8209b..d12a77c 100644
+index c240419..c1acb26 100644
 --- a/docs/build/conf.py
 +++ b/docs/build/conf.py
 @@ -30,7 +30,7 @@ import alembic

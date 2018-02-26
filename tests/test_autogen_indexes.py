@@ -557,10 +557,39 @@ class AutogenerateUniqueIndexTest(AutogenFixtureTest, TestBase):
 
         eq_(diffs, [])
 
+    # fails in the 0.8 series where we have truncation rules,
+    # but no control over quoting. passes in 0.7.9 where we don't have
+    # truncation rules either.    dropping these ancient versions
+    # is long overdue.
+
+    @config.requirements.sqlalchemy_09
+    def test_unchanged_case_sensitive_implicit_idx(self):
+        m1 = MetaData()
+        m2 = MetaData()
+        Table('add_ix', m1, Column('regNumber', String(50), index=True))
+        Table('add_ix', m2, Column('regNumber', String(50), index=True))
+        diffs = self._fixture(m1, m2)
+
+        eq_(diffs, [])
+
+    @config.requirements.sqlalchemy_09
+    def test_unchanged_case_sensitive_explicit_idx(self):
+        m1 = MetaData()
+        m2 = MetaData()
+        t1 = Table('add_ix', m1, Column('reg_number', String(50)))
+        Index('regNumber_idx', t1.c.reg_number)
+        t2 = Table('add_ix', m2, Column('reg_number', String(50)))
+        Index('regNumber_idx', t2.c.reg_number)
+
+        diffs = self._fixture(m1, m2)
+
+        eq_(diffs, [])
+
 
 class PGUniqueIndexTest(AutogenerateUniqueIndexTest):
     reports_unnamed_constraints = True
     __only_on__ = "postgresql"
+    __backend__ = True
 
     def test_idx_added_schema(self):
         m1 = MetaData()
@@ -606,6 +635,31 @@ class PGUniqueIndexTest(AutogenerateUniqueIndexTest):
               schema="test_schema")
 
         diffs = self._fixture(m1, m2, include_schemas=True)
+        eq_(diffs, [])
+
+    @config.requirements.sqlalchemy_100
+    @config.requirements.btree_gist
+    def test_exclude_const_unchanged(self):
+        from sqlalchemy.dialects.postgresql import TSRANGE, ExcludeConstraint
+
+        m1 = MetaData()
+        m2 = MetaData()
+
+        Table(
+            'add_excl', m1,
+            Column('id', Integer, primary_key=True),
+            Column('period', TSRANGE),
+            ExcludeConstraint(('period', '&&'), name='quarters_period_excl')
+        )
+
+        Table(
+            'add_excl', m2,
+            Column('id', Integer, primary_key=True),
+            Column('period', TSRANGE),
+            ExcludeConstraint(('period', '&&'), name='quarters_period_excl')
+        )
+
+        diffs = self._fixture(m1, m2)
         eq_(diffs, [])
 
     def test_same_tname_two_schemas(self):
@@ -701,6 +755,7 @@ class MySQLUniqueIndexTest(AutogenerateUniqueIndexTest):
     reports_unnamed_constraints = True
     reports_unique_constraints_as_indexes = True
     __only_on__ = 'mysql'
+    __backend__ = True
 
     def test_removed_idx_index_named_as_column(self):
         try:
@@ -716,7 +771,7 @@ class OracleUniqueIndexTest(AutogenerateUniqueIndexTest):
     reports_unnamed_constraints = True
     reports_unique_constraints_as_indexes = True
     __only_on__ = "oracle"
-
+    __backend__ = True
 
 class NoUqReflectionIndexTest(NoUqReflection, AutogenerateUniqueIndexTest):
     reports_unique_constraints = False

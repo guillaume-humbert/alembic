@@ -1,6 +1,7 @@
 from alembic.testing.requirements import SuiteRequirements
 from alembic.testing import exclusions
 from alembic import util
+from alembic.util import sqla_compat
 
 
 class DefaultRequirements(SuiteRequirements):
@@ -89,7 +90,7 @@ class DefaultRequirements(SuiteRequirements):
 
     @property
     def reflects_unique_constraints_unambiguously(self):
-        return exclusions.fails_on("mysql")
+        return exclusions.fails_on("mysql", "oracle")
 
     @property
     def reflects_pk_names(self):
@@ -115,6 +116,25 @@ class DefaultRequirements(SuiteRequirements):
 
         return exclusions.only_if(check_uuid_ossp)
 
+    def _has_pg_extension(self, name):
+        def check(config):
+            if not exclusions.against(config, "postgresql"):
+                return False
+            count = config.db.scalar(
+                "SELECT count(*) FROM pg_extension "
+                "WHERE extname='%s'" % name)
+            return bool(count)
+        return exclusions.only_if(check, "needs %s extension" % name)
+
+    @property
+    def hstore(self):
+        return self._has_pg_extension("hstore")
+
+    @property
+    def btree_gist(self):
+        return self._has_pg_extension("btree_gist")
+
+
     @property
     def autoincrement_on_composite_pk(self):
         return exclusions.skip_if(["sqlite"], "not supported by database")
@@ -123,3 +143,36 @@ class DefaultRequirements(SuiteRequirements):
     def integer_subtype_comparisons(self):
         """if a compare of Integer and BigInteger is supported yet."""
         return exclusions.skip_if(["oracle"], "not supported by alembic impl")
+
+    @property
+    def check_constraint_reflection(self):
+        return exclusions.fails_on_everything_except(
+            "postgresql", "sqlite", self._mariadb_102
+        )
+
+    @property
+    def mysql_check_reflection_or_none(self):
+        def go(config):
+            return not self._mariadb_102(config) \
+                or self.sqlalchemy_1115.enabled
+        return exclusions.succeeds_if(go)
+
+    @property
+    def mysql_timestamp_reflection(self):
+        def go(config):
+            return not self._mariadb_102(config) \
+                or self.sqlalchemy_1115.enabled
+        return exclusions.only_if(go)
+
+    def _mariadb_102(self, config):
+        return exclusions.against(config, "mysql") and \
+            sqla_compat._is_mariadb(config.db.dialect) and \
+            sqla_compat._mariadb_normalized_version_info(
+                config.db.dialect) > (10, 2)
+
+    def _mysql_not_mariadb_102(self, config):
+        return exclusions.against(config, "mysql") and (
+            not sqla_compat._is_mariadb(config.db.dialect) or
+            sqla_compat._mariadb_normalized_version_info(
+                config.db.dialect) < (10, 2)
+        )
