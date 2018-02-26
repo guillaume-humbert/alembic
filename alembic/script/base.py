@@ -87,7 +87,7 @@ class ScriptDirectory(object):
 
         dupes = set()
         for vers in paths:
-            for file_ in os.listdir(vers):
+            for file_ in Script._list_py_dir(self, vers):
                 path = os.path.realpath(os.path.join(vers, file_))
                 if path in dupes:
                     util.warn(
@@ -451,7 +451,11 @@ class ScriptDirectory(object):
 
     def _generate_create_date(self):
         if self.timezone is not None:
-            tzinfo = tz.gettz(self.timezone.upper())
+            # First, assume correct capitalization
+            tzinfo = tz.gettz(self.timezone)
+            if tzinfo is None:
+                # Fall back to uppercase
+                tzinfo = tz.gettz(self.timezone.upper())
             if tzinfo is None:
                 raise util.CommandError(
                     "Can't locate timezone: %s" % self.timezone)
@@ -488,6 +492,11 @@ class ScriptDirectory(object):
         """
         if head is None:
             head = "head"
+
+        try:
+            Script.verify_rev_id(revid)
+        except revision.RevisionError as err:
+            compat.raise_from_cause(util.CommandError(err.args[0]))
 
         with self._catch_revision_errors(multiple_heads=(
             "Multiple heads are present; please specify the head "
@@ -562,7 +571,10 @@ class ScriptDirectory(object):
             message=message if message is not None else ("empty message"),
             **kw
         )
-        script = Script._from_path(self, path)
+        try:
+            script = Script._from_path(self, path)
+        except revision.RevisionError as err:
+            compat.raise_from_cause(util.CommandError(err.args[0]))
         if branch_labels and not script.branch_labels:
             raise util.CommandError(
                 "Version %s specified branch_labels %s, however the "
@@ -737,6 +749,29 @@ class Script(revision.Revision):
     def _from_path(cls, scriptdir, path):
         dir_, filename = os.path.split(path)
         return cls._from_filename(scriptdir, dir_, filename)
+
+    @classmethod
+    def _list_py_dir(cls, scriptdir, path):
+        if scriptdir.sourceless:
+            # read files in version path, e.g. pyc or pyo files
+            # in the immediate path
+            paths = os.listdir(path)
+
+            names = set(fname.split(".")[0] for fname in paths)
+
+            # look for __pycache__
+            if os.path.exists(os.path.join(path, '__pycache__')):
+                # add all files from __pycache__ whose filename is not
+                # already in the names we got from the version directory.
+                # add as relative paths including __pycache__ token
+                paths.extend(
+                    os.path.join('__pycache__', pyc)
+                    for pyc in os.listdir(os.path.join(path, '__pycache__'))
+                    if pyc.split(".")[0] not in names
+                )
+            return paths
+        else:
+            return os.listdir(path)
 
     @classmethod
     def _from_filename(cls, scriptdir, dir_, filename):

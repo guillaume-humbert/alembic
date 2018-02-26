@@ -16,6 +16,7 @@ from alembic.environment import EnvironmentContext
 from contextlib import contextmanager
 from alembic.testing import mock
 
+
 class ApplyVersionsFunctionalTest(TestBase):
     __only_on__ = 'sqlite'
 
@@ -36,6 +37,7 @@ class ApplyVersionsFunctionalTest(TestBase):
         self._test_004_downgrade()
         self._test_005_upgrade()
         self._test_006_upgrade_again()
+        self._test_007_stamp_upgrade()
 
     def _test_001_revisions(self):
         self.a = a = util.rev_id()
@@ -129,9 +131,30 @@ class ApplyVersionsFunctionalTest(TestBase):
         assert db.dialect.has_table(db.connect(), 'bar')
         assert not db.dialect.has_table(db.connect(), 'bat')
 
+    def _test_007_stamp_upgrade(self):
+        command.stamp(self.cfg, self.c)
+        db = self.bind
+        assert db.dialect.has_table(db.connect(), 'foo')
+        assert db.dialect.has_table(db.connect(), 'bar')
+        assert not db.dialect.has_table(db.connect(), 'bat')
 
-class SourcelessApplyVersionsTest(ApplyVersionsFunctionalTest):
-    sourceless = True
+
+class SimpleSourcelessApplyVersionsTest(ApplyVersionsFunctionalTest):
+    sourceless = "simple"
+
+
+class NewFangledSourcelessEnvOnlyApplyVersionsTest(
+        ApplyVersionsFunctionalTest):
+    sourceless = "pep3147_envonly"
+
+    __requires__ = "pep3147",
+
+
+class NewFangledSourcelessEverythingApplyVersionsTest(
+        ApplyVersionsFunctionalTest):
+    sourceless = "pep3147_everything"
+
+    __requires__ = "pep3147",
 
 
 class CallbackEnvironmentTest(ApplyVersionsFunctionalTest):
@@ -194,13 +217,13 @@ class CallbackEnvironmentTest(ApplyVersionsFunctionalTest):
             assert hasattr(kw['ctx'], 'get_current_revision')
 
             step = kw['step']
-            assert isinstance(getattr(step, 'is_upgrade', None), bool)
-            assert isinstance(getattr(step, 'is_stamp', None), bool)
-            assert isinstance(getattr(step, 'is_migration', None), bool)
-            assert isinstance(getattr(step, 'up_revision_id', None),
-                              compat.string_types)
-            assert isinstance(getattr(step, 'up_revision', None), Script)
-            for revtype in 'down', 'source', 'destination':
+            assert isinstance(step.is_upgrade, bool)
+            assert isinstance(step.is_stamp, bool)
+            assert isinstance(step.is_migration, bool)
+            assert isinstance(step.up_revision_id, compat.string_types)
+            assert isinstance(step.up_revision, Script)
+
+            for revtype in 'up', 'down', 'source', 'destination':
                 revs = getattr(step, '%s_revisions' % revtype)
                 assert isinstance(revs, tuple)
                 for rev in revs:
@@ -513,7 +536,7 @@ def downgrade():
 
 """)
         pyc_path = util.pyc_file_from_path(path)
-        if os.access(pyc_path, os.F_OK):
+        if pyc_path is not None and os.access(pyc_path, os.F_OK):
             os.unlink(pyc_path)
 
         assert_raises_message(
@@ -583,8 +606,20 @@ class IgnoreFilesTest(TestBase):
         self._test_ignore_dot_hash_py("pyo")
 
 
-class SourcelessIgnoreFilesTest(IgnoreFilesTest):
-    sourceless = True
+class SimpleSourcelessIgnoreFilesTest(IgnoreFilesTest):
+    sourceless = "simple"
+
+
+class NewFangledEnvOnlySourcelessIgnoreFilesTest(IgnoreFilesTest):
+    sourceless = "pep3147_envonly"
+
+    __requires__ = "pep3147",
+
+
+class NewFangledEverythingSourcelessIgnoreFilesTest(IgnoreFilesTest):
+    sourceless = "pep3147_everything"
+
+    __requires__ = "pep3147",
 
 
 class SourcelessNeedsFlagTest(TestBase):

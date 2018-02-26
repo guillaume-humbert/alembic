@@ -3,6 +3,7 @@ from sqlalchemy import DateTime, MetaData, Table, Column, text, Integer, \
     String, Interval, Sequence, Numeric, BigInteger, Float, Numeric
 from sqlalchemy.dialects.postgresql import ARRAY, UUID, BYTEA
 from sqlalchemy.engine.reflection import Inspector
+from sqlalchemy import types
 from alembic.operations import Operations
 from sqlalchemy.sql import table, column
 from alembic.autogenerate.compare import \
@@ -68,6 +69,27 @@ class PostgresqlOpTest(TestBase):
         context.assert_(
             "CREATE INDEX geocoded ON locations (coordinates) "
             "WHERE locations.coordinates != Null")
+
+    @config.requirements.fail_before_sqla_099
+    def test_create_index_postgresql_concurrently(self):
+        context = op_fixture("postgresql")
+        op.create_index(
+            'geocoded',
+            'locations',
+            ['coordinates'],
+            postgresql_concurrently=True)
+        context.assert_(
+            "CREATE INDEX CONCURRENTLY geocoded ON locations (coordinates)")
+
+    @config.requirements.fail_before_sqla_110
+    def test_drop_index_postgresql_concurrently(self):
+        context = op_fixture("postgresql")
+        op.drop_index(
+            'geocoded',
+            'locations',
+            postgresql_concurrently=True)
+        context.assert_(
+            "DROP INDEX CONCURRENTLY geocoded")
 
     def test_alter_column_type_using(self):
         context = op_fixture('postgresql')
@@ -210,6 +232,7 @@ def downgrade():
 
 class PostgresqlInlineLiteralTest(TestBase):
     __only_on__ = 'postgresql'
+    __backend__ = True
 
     @classmethod
     def setup_class(cls):
@@ -256,6 +279,8 @@ class PostgresqlInlineLiteralTest(TestBase):
 
 class PostgresqlDefaultCompareTest(TestBase):
     __only_on__ = 'postgresql'
+    __backend__ = True
+
 
     @classmethod
     def setup_class(cls):
@@ -491,6 +516,7 @@ class PostgresqlDefaultCompareTest(TestBase):
 
 class PostgresqlDetectSerialTest(TestBase):
     __only_on__ = 'postgresql'
+    __backend__ = True
 
     @classmethod
     def setup_class(cls):
@@ -643,7 +669,7 @@ unique=False, """
         )
 
     @config.requirements.sqlalchemy_09
-    def test_array_type(self):
+    def test_postgresql_array_type(self):
 
         eq_ignore_whitespace(
             autogenerate.render._repr_type(
@@ -662,6 +688,34 @@ unique=False, """
                 ARRAY(BYTEA, as_tuple=True, dimensions=2),
                 self.autogen_context),
             "postgresql.ARRAY(postgresql.BYTEA(), as_tuple=True, dimensions=2)"
+        )
+
+        assert 'from sqlalchemy.dialects import postgresql' in \
+            self.autogen_context.imports
+
+    @config.requirements.sqlalchemy_110
+    def test_generic_array_type(self):
+
+        eq_ignore_whitespace(
+            autogenerate.render._repr_type(
+                types.ARRAY(Integer), self.autogen_context),
+            "sa.ARRAY(sa.Integer())"
+        )
+
+        eq_ignore_whitespace(
+            autogenerate.render._repr_type(
+                types.ARRAY(DateTime(timezone=True)), self.autogen_context),
+            "sa.ARRAY(sa.DateTime(timezone=True))"
+        )
+
+        assert 'from sqlalchemy.dialects import postgresql' not in \
+            self.autogen_context.imports
+
+        eq_ignore_whitespace(
+            autogenerate.render._repr_type(
+                types.ARRAY(BYTEA, as_tuple=True, dimensions=2),
+                self.autogen_context),
+            "sa.ARRAY(postgresql.BYTEA(), as_tuple=True, dimensions=2)"
         )
 
         assert 'from sqlalchemy.dialects import postgresql' in \
