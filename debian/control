@@ -39,7 +39,7 @@ Architecture: all
 Depends:
  python3-alembic (=${binary:Version}),
  ${misc:Depends},
- ${python:Depends},
+ ${python3:Depends},
  ${sphinxdoc:Depends},
 Breaks:
  python-alembic (<< 0.8.8-3),

@@ -5,6 +5,7 @@ alembic (0.9.7-1) UNRELEASED; urgency=medium
   * d/control: Set Vcs-* to salsa.debian.org
   * Bump debhelper compat level to 11
   * Remove empty site_custom_css.css from docs
+  * d/control: Use ${python3:Depends} from alembic
 
  -- Ondřej Nový <onovy@debian.org>  Sat, 09 Dec 2017 14:30:45 +0100
 
