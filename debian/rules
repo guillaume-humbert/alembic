@@ -12,6 +12,7 @@ override_dh_sphinxdoc:
 ifeq (,$(findstring nodocs, $(DEB_BUILD_OPTIONS)))
 	sphinx-build -b html docs/build $(CURDIR)/debian/alembic/usr/share/doc/alembic/html
 	dh_sphinxdoc
+	rm $(CURDIR)/debian/alembic/usr/share/doc/alembic/html/_static/site_custom_css.css
 endif
 
 override_dh_auto_install:

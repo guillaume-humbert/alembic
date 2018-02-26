@@ -4,6 +4,7 @@ alembic (0.9.7-1) UNRELEASED; urgency=medium
   * Standards-Version is 4.1.2 now (no changes needed)
   * d/control: Set Vcs-* to salsa.debian.org
   * Bump debhelper compat level to 11
+  * Remove empty site_custom_css.css from docs
 
  -- Ondřej Nový <onovy@debian.org>  Sat, 09 Dec 2017 14:30:45 +0100
 
