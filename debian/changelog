@@ -7,6 +7,7 @@ alembic (0.9.7-1) UNRELEASED; urgency=medium
   * Remove empty site_custom_css.css from docs
   * d/control: Use ${python3:Depends} from alembic
   * d/copyright: Bump my copyright year
+  * d/rules: Remove test_schema.db after tests
 
  -- Ondřej Nový <onovy@debian.org>  Sat, 09 Dec 2017 14:30:45 +0100
 
