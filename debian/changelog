@@ -2,6 +2,7 @@ alembic (1.0.0-1) UNRELEASED; urgency=medium
 
   * New upstream release
   * Convert git repository from git-dpm to gbp layout
+  * Use 'python3 -m sphinx' instead of sphinx-build for building docs
 
  -- Ondřej Nový <onovy@debian.org>  Wed, 08 Aug 2018 09:23:39 +0200
 

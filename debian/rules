@@ -10,7 +10,7 @@ export PYBUILD_AFTER_TEST=rm {build_dir}/setup.cfg ; rm -r {build_dir}/scratch ;
 
 override_dh_sphinxdoc:
 ifeq (,$(findstring nodocs, $(DEB_BUILD_OPTIONS)))
-	sphinx-build -b html docs/build $(CURDIR)/debian/alembic/usr/share/doc/alembic/html
+	python3 -m sphinx -b html docs/build $(CURDIR)/debian/alembic/usr/share/doc/alembic/html
 	dh_sphinxdoc
 	rm $(CURDIR)/debian/alembic/usr/share/doc/alembic/html/_static/site_custom_css.css
 endif
