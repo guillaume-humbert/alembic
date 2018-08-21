@@ -21,7 +21,6 @@ from sqlalchemy import exc
 
 
 class BatchApplyTest(TestBase):
-    __requires__ = ('sqlalchemy_08', )
 
     def setUp(self):
         self.op = Operations(mock.Mock(opts={}))
@@ -420,9 +419,6 @@ class BatchApplyTest(TestBase):
             ddl_contains='FOREIGN KEY(user_id_3, user_id_version) '
             'REFERENCES "user" (id, id_version)')
 
-    # _get_colspec() in 0.8 calls upon fk.column when schema is
-    # present.  not sure if we want to try to fix this
-    @config.requirements.fail_before_sqla_09
     def test_regen_multi_fk_schema(self):
         impl = self._multi_fk_fixture(schema='foo_schema')
         self._assert_impl(
@@ -558,7 +554,6 @@ class BatchApplyTest(TestBase):
 
 
 class BatchAPITest(TestBase):
-    __requires__ = ('sqlalchemy_08', )
 
     @contextmanager
     def _fixture(self, schema=None):
@@ -754,7 +749,6 @@ class BatchAPITest(TestBase):
 
 
 class CopyFromTest(TestBase):
-    __requires__ = ('sqlalchemy_08', )
 
     def _fixture(self):
         self.metadata = MetaData()
@@ -918,7 +912,6 @@ class CopyFromTest(TestBase):
 
 
 class BatchRoundTripTest(TestBase):
-    __requires__ = ('sqlalchemy_08', )
     __only_on__ = "sqlite"
 
     def setUp(self):
@@ -1207,6 +1200,36 @@ class BatchRoundTripTest(TestBase):
             {"id": 5, "x": 9}
         ])
 
+    def test_drop_pk_col_readd_col(self):
+        # drop a column, add it back without primary_key=True, should no
+        # longer be in the constraint
+        with self.op.batch_alter_table("foo") as batch_op:
+            batch_op.drop_column('id')
+            batch_op.add_column(Column('id', Integer))
+
+        pk_const = Inspector.from_engine(self.conn).get_pk_constraint('foo')
+        eq_(pk_const['constrained_columns'], [])
+
+    def test_drop_pk_col_readd_pk_col(self):
+        # drop a column, add it back with primary_key=True, should remain
+        with self.op.batch_alter_table("foo") as batch_op:
+            batch_op.drop_column('id')
+            batch_op.add_column(Column('id', Integer, primary_key=True))
+
+        pk_const = Inspector.from_engine(self.conn).get_pk_constraint('foo')
+        eq_(pk_const['constrained_columns'], ['id'])
+
+    def test_drop_pk_col_readd_col_also_pk_const(self):
+        # drop a column, add it back without primary_key=True, but then
+        # also make anew PK constraint that includes it, should remain
+        with self.op.batch_alter_table("foo") as batch_op:
+            batch_op.drop_column('id')
+            batch_op.add_column(Column('id', Integer))
+            batch_op.create_primary_key('newpk', ['id'])
+
+        pk_const = Inspector.from_engine(self.conn).get_pk_constraint('foo')
+        eq_(pk_const['constrained_columns'], ['id'])
+
     def test_add_pk_constraint(self):
         self._no_pk_fixture()
         with self.op.batch_alter_table("nopk", recreate="always") as batch_op:
@@ -1427,6 +1450,16 @@ class BatchRoundTripMySQLTest(BatchRoundTripTest):
     __only_on__ = "mysql"
 
     @exclusions.fails()
+    def test_drop_pk_col_readd_pk_col(self):
+        super(BatchRoundTripMySQLTest, self).test_drop_pk_col_readd_pk_col()
+
+    @exclusions.fails()
+    def test_drop_pk_col_readd_col_also_pk_const(self):
+        super(
+            BatchRoundTripMySQLTest, self
+        ).test_drop_pk_col_readd_col_also_pk_const()
+
+    @exclusions.fails()
     def test_rename_column_pk(self):
         super(BatchRoundTripMySQLTest, self).test_rename_column_pk()
 
@@ -1456,6 +1489,17 @@ class BatchRoundTripMySQLTest(BatchRoundTripTest):
 
 class BatchRoundTripPostgresqlTest(BatchRoundTripTest):
     __only_on__ = "postgresql"
+
+    @exclusions.fails()
+    def test_drop_pk_col_readd_pk_col(self):
+        super(
+            BatchRoundTripPostgresqlTest, self).test_drop_pk_col_readd_pk_col()
+
+    @exclusions.fails()
+    def test_drop_pk_col_readd_col_also_pk_const(self):
+        super(
+            BatchRoundTripPostgresqlTest, self
+        ).test_drop_pk_col_readd_col_also_pk_const()
 
     @exclusions.fails()
     def test_change_type(self):
