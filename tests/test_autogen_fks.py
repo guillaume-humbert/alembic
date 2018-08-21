@@ -5,7 +5,7 @@ from sqlalchemy import MetaData, Column, Table, Integer, String, \
     ForeignKeyConstraint
 from alembic.testing import eq_
 
-py3k = sys.version_info >= (3, )
+py3k = sys.version_info.major >= 3
 
 from ._autogen_fixtures import AutogenFixtureTest
 
@@ -476,7 +476,7 @@ class IncludeHooksTest(AutogenFixtureTest, TestBase):
 
 class AutogenerateFKOptionsTest(AutogenFixtureTest, TestBase):
     __backend__ = True
-    __requires__ = ('sqlalchemy_09', 'flexible_fk_cascades')
+    __requires__ = ('flexible_fk_cascades', )
 
     def _fk_opts_fixture(self, old_opts, new_opts):
         m1 = MetaData()

@@ -4,6 +4,165 @@ Changelog
 ==========
 
 .. changelog::
+    :version: 1.0.0
+    :released: July 13, 2018
+    :released: July 13, 2018
+    :released: July 13, 2018
+
+    .. change::
+        :tags: feature, general
+        :tickets: 491
+
+        For Alembic 1.0, Python 2.6 / 3.3 support is being dropped, allowing a
+        fixed setup.py to be built as well as universal wheels.  Pull request
+        courtesy Hugo.
+
+
+
+
+    .. change::
+        :tags: feature, general
+
+        With the 1.0 release, Alembic's minimum SQLAlchemy support version
+        moves to 0.9.0, previously 0.7.9.
+
+    .. change::
+        :tags: bug, batch
+        :tickets: 502
+
+        Fixed issue in batch where dropping a primary key column, then adding it
+        back under the same name but without the primary_key flag, would not remove
+        it from the existing PrimaryKeyConstraint.  If a new PrimaryKeyConstraint
+        is added, it is used as-is, as was the case before.
+
+.. changelog::
+    :version: 0.9.10
+    :released: June 29, 2018
+
+    .. change::
+        :tags: bug, autogenerate
+
+        The "op.drop_constraint()" directive will now render using ``repr()`` for
+        the schema name, in the same way that "schema" renders for all the other op
+        directives.  Pull request courtesy Denis Kataev.
+
+    .. change::
+        :tags: bug, autogenerate
+        :tickets: 494
+
+        Added basic capabilities for external dialects to support rendering of
+        "nested" types, like arrays, in a manner similar to that of the Postgresql
+        dialect.
+
+    .. change::
+        :tags: bug, autogenerate
+
+        Fixed issue where "autoincrement=True" would not render for a column that
+        specified it, since as of SQLAlchemy 1.1 this is no longer the default
+        value for "autoincrement".  Note the behavior only takes effect against the
+        SQLAlchemy 1.1.0 and higher; for pre-1.1 SQLAlchemy, "autoincrement=True"
+        does not render as was the case before. Pull request courtesy  Elad Almos.
+
+.. changelog::
+    :version: 0.9.9
+    :released: March 22, 2018
+
+    .. change::
+        :tags: feature, commands
+        :tickets: 481
+
+        Added new flag ``--indicate-current`` to the ``alembic history`` command.
+        When listing versions, it will include the token "(current)" to indicate
+        the given version is a current head in the target database.  Pull request
+        courtesy Kazutaka Mise.
+
+    .. change::
+        :tags: bug, autogenerate, mysql
+        :tickets: 455
+
+        The fix for :ticket:`455` in version 0.9.6 involving MySQL server default
+        comparison was entirely non functional, as the test itself was also broken
+        and didn't reveal that it wasn't working. The regular expression to compare
+        server default values like CURRENT_TIMESTAMP to current_timestamp() is
+        repaired.
+
+    .. change::
+        :tags: bug, mysql, autogenerate
+        :tickets: 483
+
+        Fixed bug where MySQL server default comparisons were basically not working
+        at all due to incorrect regexp added in :ticket:`455`.  Also accommodates
+        for MariaDB 10.2 quoting differences in reporting integer based server
+        defaults.
+
+
+
+
+    .. change::
+        :tags: bug, operations, mysql
+        :tickets: 487
+
+        Fixed bug in ``op.drop_constraint()`` for MySQL where
+        quoting rules would not be applied to the constraint name.
+
+.. changelog::
+    :version: 0.9.8
+    :released: February 16, 2018
+
+    .. change::
+        :tags: bug, runtime
+        :tickets: 482
+
+        Fixed bug where the :meth:`.Script.as_revision_number` method
+        did not accommodate for the 'heads' identifier, which in turn
+        caused the :meth:`.EnvironmentContext.get_head_revisions`
+        and :meth:`.EnvironmentContext.get_revision_argument` methods
+        to be not usable when multiple heads were present.
+        The :meth:.`EnvironmentContext.get_head_revisions` method returns
+        a tuple in all cases as documented.
+
+
+
+    .. change::
+        :tags: bug, postgresql, autogenerate
+        :tickets: 478
+
+        Fixed bug where autogenerate of :class:`.ExcludeConstraint`
+        would render a raw quoted name for a Column that has case-sensitive
+        characters, which when invoked as an inline member of the Table
+        would produce a stack trace that the quoted name is not found.
+        An incoming Column object is now rendered as ``sa.column('name')``.
+
+    .. change::
+        :tags: bug, autogenerate
+        :tickets: 468
+
+        Fixed bug where the indexes would not be included in a
+        migration that was dropping the owning table.   The fix
+        now will also emit DROP INDEX for the indexes ahead of time,
+        but more importantly will include CREATE INDEX in the
+        downgrade migration.
+
+    .. change::
+        :tags: bug, postgresql
+        :tickets: 480
+
+        Fixed the autogenerate of the module prefix
+        when rendering the text_type parameter of
+        postgresql.HSTORE, in much the same way that
+        we do for ARRAY's type and JSON's text_type.
+
+    .. change::
+        :tags: bug, mysql
+        :tickets: 479
+
+        Added support for DROP CONSTRAINT to the MySQL Alembic
+        dialect to support MariaDB 10.2 which now has real
+        CHECK constraints.  Note this change does **not**
+        add autogenerate support, only support for op.drop_constraint()
+        to work.
+
+.. changelog::
     :version: 0.9.7
     :released: January 16, 2018
 

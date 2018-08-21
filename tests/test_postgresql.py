@@ -32,7 +32,7 @@ from sqlalchemy.sql import false
 
 
 if util.sqla_09:
-    from sqlalchemy.dialects.postgresql import JSON, JSONB
+    from sqlalchemy.dialects.postgresql import JSON, JSONB, HSTORE
 
 
 class PostgresqlOpTest(TestBase):
@@ -47,7 +47,6 @@ class PostgresqlOpTest(TestBase):
         op.rename_table('t1', 't2', schema="foo")
         context.assert_("ALTER TABLE foo.t1 RENAME TO t2")
 
-    @config.requirements.fail_before_sqla_080
     def test_create_index_postgresql_expressions(self):
         context = op_fixture("postgresql")
         op.create_index(
@@ -196,7 +195,6 @@ def downgrade():
 
 """ % self.rid)
 
-    @config.requirements.sqlalchemy_09
     def test_offline_inline_enum_create(self):
         self._inline_enum_script()
         with capture_context_buffer() as buf:
@@ -213,7 +211,6 @@ def downgrade():
         # no drop since we didn't emit events
         assert "DROP TYPE pgenum" not in buf.getvalue()
 
-    @config.requirements.sqlalchemy_09
     def test_offline_distinct_enum_create(self):
         self._distinct_enum_script()
         with capture_context_buffer() as buf:
@@ -638,20 +635,12 @@ class PostgresqlAutogenRenderTest(TestBase):
 
         op_obj = ops.CreateIndexOp.from_index(idx)
 
-        if util.sqla_08:
-            eq_ignore_whitespace(
-                autogenerate.render_op_text(autogen_context, op_obj),
-                """op.create_index('foo_idx', 't', \
+        eq_ignore_whitespace(
+            autogenerate.render_op_text(autogen_context, op_obj),
+            """op.create_index('foo_idx', 't', \
 ['x', 'y'], unique=False, """
-                """postgresql_where=sa.text(!U"y = 'something'"))"""
-            )
-        else:
-            eq_ignore_whitespace(
-                autogenerate.render_op_text(autogen_context, op_obj),
-                """op.create_index('foo_idx', 't', ['x', 'y'], \
-unique=False, """
-                """postgresql_where=sa.text(!U't.y = %(y_1)s'))"""
-            )
+            """postgresql_where=sa.text(!U"y = 'something'"))"""
+        )
 
     def test_render_server_default_native_boolean(self):
         c = Column(
@@ -668,7 +657,6 @@ unique=False, """
             'nullable=False)'
         )
 
-    @config.requirements.sqlalchemy_09
     def test_postgresql_array_type(self):
 
         eq_ignore_whitespace(
@@ -688,6 +676,29 @@ unique=False, """
                 ARRAY(BYTEA, as_tuple=True, dimensions=2),
                 self.autogen_context),
             "postgresql.ARRAY(postgresql.BYTEA(), as_tuple=True, dimensions=2)"
+        )
+
+        assert 'from sqlalchemy.dialects import postgresql' in \
+            self.autogen_context.imports
+
+    @config.requirements.sqlalchemy_110
+    def test_postgresql_hstore_subtypes(self):
+        eq_ignore_whitespace(
+            autogenerate.render._repr_type(
+                HSTORE(), self.autogen_context),
+            "postgresql.HSTORE(text_type=sa.Text())"
+        )
+
+        eq_ignore_whitespace(
+            autogenerate.render._repr_type(
+                HSTORE(text_type=String()), self.autogen_context),
+            "postgresql.HSTORE(text_type=sa.String())"
+        )
+
+        eq_ignore_whitespace(
+            autogenerate.render._repr_type(
+                HSTORE(text_type=BYTEA()), self.autogen_context),
+            "postgresql.HSTORE(text_type=postgresql.BYTEA())"
         )
 
         assert 'from sqlalchemy.dialects import postgresql' in \
@@ -721,7 +732,6 @@ unique=False, """
         assert 'from sqlalchemy.dialects import postgresql' in \
             self.autogen_context.imports
 
-    @config.requirements.sqlalchemy_09
     def test_array_type_user_defined_inner(self):
         def repr_type(typestring, object_, autogen_context):
             if typestring == 'type' and isinstance(object_, String):
@@ -760,9 +770,35 @@ unique=False, """
 
         eq_ignore_whitespace(
             autogenerate.render_op_text(autogen_context, op_obj),
-            "op.create_exclude_constraint('t_excl_x', 't', ('x', '>'), "
+            "op.create_exclude_constraint('t_excl_x', 't', (sa.column('x'), '>'), "
             "where=sa.text(!U'x != 2'), using='gist')"
         )
+
+    @config.requirements.fail_before_sqla_100
+    def test_add_exclude_constraint_case_sensitive(self):
+        from sqlalchemy.dialects.postgresql import ExcludeConstraint
+
+        autogen_context = self.autogen_context
+
+        m = MetaData()
+        t = Table('TTAble', m,
+                  Column('XColumn', String),
+                  Column('YColumn', String)
+                  )
+
+        op_obj = ops.AddConstraintOp.from_constraint(ExcludeConstraint(
+            (t.c.XColumn, ">"),
+            where=t.c.XColumn != 2,
+            using="gist",
+            name="t_excl_x"
+        ))
+
+        eq_ignore_whitespace(
+            autogenerate.render_op_text(autogen_context, op_obj),
+            "op.create_exclude_constraint('t_excl_x', 'TTAble', (sa.column('XColumn'), '>'), "
+            "where=sa.text(!U'\"XColumn\" != 2'), using='gist')"
+        )
+
 
     @config.requirements.fail_before_sqla_100
     def test_inline_exclude_constraint(self):
@@ -794,7 +830,37 @@ unique=False, """
             ")"
         )
 
-    @config.requirements.sqlalchemy_09
+    @config.requirements.fail_before_sqla_100
+    def test_inline_exclude_constraint_case_sensitive(self):
+        from sqlalchemy.dialects.postgresql import ExcludeConstraint
+
+        autogen_context = self.autogen_context
+
+        m = MetaData()
+        t = Table(
+            'TTable', m,
+            Column('XColumn', String),
+            Column('YColumn', String),
+        )
+        ExcludeConstraint(
+            (t.c.XColumn, ">"),
+            using="gist",
+            where='"XColumn" != 2',
+            name="TExclX"
+        )
+
+        op_obj = ops.CreateTableOp.from_table(t)
+
+        eq_ignore_whitespace(
+            autogenerate.render_op_text(autogen_context, op_obj),
+            "op.create_table('TTable',sa.Column('XColumn', sa.String(), "
+            "nullable=True),"
+            "sa.Column('YColumn', sa.String(), nullable=True),"
+            "postgresql.ExcludeConstraint((sa.column('XColumn'), '>'), "
+            "where=sa.text(!U'\"XColumn\" != 2'), using='gist', "
+            "name='TExclX'))"
+        )
+
     def test_json_type(self):
         if config.requirements.sqlalchemy_110.enabled:
             eq_ignore_whitespace(
@@ -809,7 +875,6 @@ unique=False, """
                 "postgresql.JSON()"
             )
 
-    @config.requirements.sqlalchemy_09
     def test_jsonb_type(self):
         if config.requirements.sqlalchemy_110.enabled:
             eq_ignore_whitespace(
