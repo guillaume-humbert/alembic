@@ -1,9 +1,9 @@
-alembic (1.0.0-2) UNRELEASED; urgency=medium
+alembic (1.0.0-2) unstable; urgency=medium
 
   * Team upload.
   * Remove pytest_cache directory after running tests (Closes: #909529)
 
- -- Nicolas Dandrimont <olasd@debian.org>  Tue, 25 Sep 2018 13:10:07 +0200
+ -- Nicolas Dandrimont <olasd@debian.org>  Tue, 25 Sep 2018 13:13:59 +0200
 
 alembic (1.0.0-1) unstable; urgency=medium
 
