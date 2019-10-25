@@ -22,6 +22,7 @@ from sqlalchemy import Numeric
 from sqlalchemy import PrimaryKeyConstraint
 from sqlalchemy import String
 from sqlalchemy import Table
+from sqlalchemy import testing
 from sqlalchemy import text
 from sqlalchemy import types
 from sqlalchemy import Unicode
@@ -45,9 +46,9 @@ from alembic.testing import assertions
 from alembic.testing import config
 from alembic.testing import eq_
 from alembic.testing import eq_ignore_whitespace
+from alembic.testing import mock
 from alembic.testing import TestBase
 from alembic.testing.fixtures import op_fixture
-from alembic.testing.mock import patch
 from alembic.util import compat
 
 py3k = sys.version_info >= (3,)
@@ -87,6 +88,23 @@ class AutogenRenderTest(TestBase):
             autogenerate.render_op_text(self.autogen_context, op_obj),
             "op.create_index('test_active_code_idx', 'test', "
             "['active', 'code'], unique=False)",
+        )
+
+    @testing.emits_warning("Can't validate argument ")
+    def test_render_add_index_custom_kwarg(self):
+        t = Table(
+            "test",
+            MetaData(),
+            Column("id", Integer, primary_key=True),
+            Column("active", Boolean()),
+            Column("code", String(255)),
+        )
+        idx = Index(None, t.c.active, t.c.code, somedialect_foobar="option")
+        op_obj = ops.CreateIndexOp.from_index(idx)
+        eq_ignore_whitespace(
+            autogenerate.render_op_text(self.autogen_context, op_obj),
+            "op.create_index(op.f('ix_test_active'), 'test', "
+            "['active', 'code'], unique=False, somedialect_foobar='option')",
         )
 
     def test_render_add_index_batch(self):
@@ -181,18 +199,11 @@ class AutogenRenderTest(TestBase):
         idx = Index("test_lower_code_idx", cast(t.c.code, String))
         op_obj = ops.CreateIndexOp.from_index(idx)
 
-        if config.requirements.sqlalchemy_110.enabled:
-            eq_ignore_whitespace(
-                autogenerate.render_op_text(self.autogen_context, op_obj),
-                "op.create_index('test_lower_code_idx', 'test', "
-                "[sa.text(!U'CAST(code AS VARCHAR)')], unique=False)",
-            )
-        else:
-            eq_ignore_whitespace(
-                autogenerate.render_op_text(self.autogen_context, op_obj),
-                "op.create_index('test_lower_code_idx', 'test', "
-                "[sa.text(!U'CAST(code AS VARCHAR)')], unique=False)",
-            )
+        eq_ignore_whitespace(
+            autogenerate.render_op_text(self.autogen_context, op_obj),
+            "op.create_index('test_lower_code_idx', 'test', "
+            "[sa.text(!U'CAST(code AS VARCHAR)')], unique=False)",
+        )
 
     def test_render_add_index_desc(self):
         m = MetaData()
@@ -854,7 +865,7 @@ class AutogenRenderTest(TestBase):
                 "SomeCustomConstraint(Column('id', Integer(), table=<t>))])",
             )
 
-    @patch("alembic.autogenerate.render.MAX_PYTHON_ARGS", 3)
+    @mock.patch("alembic.autogenerate.render.MAX_PYTHON_ARGS", 3)
     def test_render_table_max_cols(self):
         m = MetaData()
         t = Table(
@@ -1035,7 +1046,6 @@ class AutogenRenderTest(TestBase):
             "sa.PrimaryKeyConstraint('x'))",
         )
 
-    @config.requirements.fail_before_sqla_110
     def test_render_table_w_autoincrement(self):
         m = MetaData()
         t = Table(
@@ -1063,6 +1073,21 @@ class AutogenRenderTest(TestBase):
             autogenerate.render_op_text(self.autogen_context, op_obj),
             "op.add_column('foo', sa.Column('x', sa.Integer(), "
             "server_default='5', nullable=True))",
+        )
+
+    @testing.requires.sqlalchemy_13
+    @testing.emits_warning("Can't validate argument ")
+    def test_render_add_column_custom_kwarg(self):
+        col = Column(
+            "x", Integer, server_default="5", somedialect_foobar="option"
+        )
+        Table("foo", MetaData(), col)
+
+        op_obj = ops.AddColumnOp.from_column(col)
+        eq_ignore_whitespace(
+            autogenerate.render_op_text(self.autogen_context, op_obj),
+            "op.add_column('foo', sa.Column('x', sa.Integer(), "
+            "server_default='5', nullable=True, somedialect_foobar='option'))",
         )
 
     def test_render_add_column_system(self):
@@ -1164,7 +1189,7 @@ class AutogenRenderTest(TestBase):
             result,
             "sa.Column('some_key', sa.Integer(), "
             "nullable=True, "
-            "comment=\"This is a john's comment\")",
+            'comment="This is a john\'s comment")',
         )
 
     def test_render_col_autoinc_false_mysql(self):
@@ -1587,7 +1612,6 @@ class AutogenRenderTest(TestBase):
             "sa.Enum('one', 'two', 'three')",
         )
 
-    @config.requirements.sqlalchemy_099
     def test_render_non_native_enum(self):
         eq_ignore_whitespace(
             autogenerate.render._repr_type(
@@ -1604,7 +1628,6 @@ class AutogenRenderTest(TestBase):
             "sa.Integer()",
         )
 
-    @config.requirements.sqlalchemy_110
     def test_generic_array_type(self):
 
         eq_ignore_whitespace(
@@ -1621,7 +1644,6 @@ class AutogenRenderTest(TestBase):
             "sa.ARRAY(sa.DateTime(timezone=True))",
         )
 
-    @config.requirements.sqlalchemy_110
     def test_render_array_no_context(self):
         uo = ops.UpgradeOps(
             ops=[
@@ -1653,6 +1675,25 @@ class AutogenRenderTest(TestBase):
         eq_ignore_whitespace(
             autogenerate.render._repr_type(type_, self.autogen_context),
             "sqlalchemy_util.types.MyType()",
+        )
+
+    def test_render_variant(self):
+        from sqlalchemy import VARCHAR, CHAR
+
+        self.autogen_context.opts["user_module_prefix"] = None
+
+        type_ = (
+            String(5)
+            .with_variant(VARCHAR(10), "mysql")
+            .with_variant(CHAR(15), "oracle")
+        )
+
+        # the new Black formatting will help a lot with this
+        eq_ignore_whitespace(
+            autogenerate.render._repr_type(type_, self.autogen_context),
+            "sa.String(length=5)."
+            "with_variant('mysql', sa.VARCHAR(length=10))."
+            "with_variant('oracle', sa.CHAR(length=15))",
         )
 
     def test_repr_user_type_user_prefix_None(self):
@@ -1867,6 +1908,23 @@ class AutogenRenderTest(TestBase):
             ")",
         )
 
+    @config.requirements.comments_api
+    def test_render_create_table_comment_with_quote_op(self):
+        op_obj = ops.CreateTableCommentOp(
+            "table_name",
+            "This is john's comment",
+            existing_comment='This was john\'s "comment"',
+        )
+        eq_ignore_whitespace(
+            autogenerate.render_op_text(self.autogen_context, op_obj),
+            "op.create_table_comment("
+            "   'table_name',"
+            '   "This is john\'s comment",'
+            "   existing_comment='This was john\\'s \"comment\"',"
+            "   schema=None"
+            ")",
+        )
+
     def test_render_create_table_comment_op_with_existing_comment(self):
         op_obj = ops.CreateTableCommentOp(
             "table_name", "comment", existing_comment="old comment"
@@ -1906,10 +1964,21 @@ class AutogenRenderTest(TestBase):
             ")",
         )
 
+    def test_render_drop_table_comment_op_existing_with_quote(self):
+        op_obj = ops.DropTableCommentOp(
+            "table_name", existing_comment="This was john's comment"
+        )
+        eq_ignore_whitespace(
+            autogenerate.render_op_text(self.autogen_context, op_obj),
+            "op.drop_table_comment("
+            "   'table_name',"
+            '   existing_comment="This was john\'s comment",'
+            "   schema=None"
+            ")",
+        )
+
 
 class RenderNamingConventionTest(TestBase):
-    __requires__ = ("sqlalchemy_094",)
-
     def setUp(self):
 
         convention = {

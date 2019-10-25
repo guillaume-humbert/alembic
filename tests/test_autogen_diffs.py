@@ -36,8 +36,8 @@ from alembic.testing import config
 from alembic.testing import eq_
 from alembic.testing import is_
 from alembic.testing import is_not_
+from alembic.testing import mock
 from alembic.testing import TestBase
-from alembic.testing.mock import Mock
 from alembic.util import CommandError
 from ._autogen_fixtures import AutogenFixtureTest
 from ._autogen_fixtures import AutogenTest
@@ -751,11 +751,6 @@ class AutogenSystemColTest(AutogenTest, TestBase):
 class AutogenerateVariantCompareTest(AutogenTest, TestBase):
     __backend__ = True
 
-    # 1.0.13 and lower fail on Postgresql due to variant / bigserial issue
-    # #3739
-
-    __requires__ = ("sqlalchemy_1014",)
-
     @classmethod
     def _get_db_schema(cls):
         m = MetaData()
@@ -824,7 +819,7 @@ class AutogenerateCustomCompareTypeTest(AutogenTest, TestBase):
         return m
 
     def test_uses_custom_compare_type_function(self):
-        my_compare_type = Mock()
+        my_compare_type = mock.Mock()
         self.context._user_compare_type = my_compare_type
 
         uo = ops.UpgradeOps(ops=[])
@@ -853,7 +848,7 @@ class AutogenerateCustomCompareTypeTest(AutogenTest, TestBase):
         eq_(type(inspected_type), INTEGER)
 
     def test_column_type_not_modified_custom_compare_type_returns_False(self):
-        my_compare_type = Mock()
+        my_compare_type = mock.Mock()
         my_compare_type.return_value = False
         self.context._user_compare_type = my_compare_type
 
@@ -865,7 +860,7 @@ class AutogenerateCustomCompareTypeTest(AutogenTest, TestBase):
         eq_(diffs, [])
 
     def test_column_type_modified_custom_compare_type_returns_True(self):
-        my_compare_type = Mock()
+        my_compare_type = mock.Mock()
         my_compare_type.return_value = True
         self.context._user_compare_type = my_compare_type
 
@@ -1544,7 +1539,6 @@ class AutoincrementTest(AutogenFixtureTest, TestBase):
         ops = self._fixture(m1, m2, return_ops=True)
         assert "autoincrement" not in ops.ops[0].ops[0].kw
 
-    @config.requirements.fail_before_sqla_110
     def test_alter_column_autoincrement_nonpk_explicit_true(self):
         m1 = MetaData()
         m2 = MetaData()

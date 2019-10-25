@@ -19,31 +19,26 @@ v.close()
 readme = os.path.join(os.path.dirname(__file__), "README.rst")
 
 requires = [
-    "SQLAlchemy>=0.9.0",
+    "SQLAlchemy>=1.1.0",
     "Mako",
     "python-editor>=0.3",
     "python-dateutil",
 ]
 
 
-class PyTest(TestCommand):
-    user_options = [("pytest-args=", "a", "Arguments to pass to py.test")]
-
-    def initialize_options(self):
-        TestCommand.initialize_options(self)
-        self.pytest_args = []
-
-    def finalize_options(self):
-        TestCommand.finalize_options(self)
-        self.test_args = []
-        self.test_suite = True
+class UseTox(TestCommand):
+    RED = 31
+    RESET_SEQ = "\033[0m"
+    BOLD_SEQ = "\033[1m"
+    COLOR_SEQ = "\033[1;%dm"
 
     def run_tests(self):
-        # import here, cause outside the eggs aren't loaded
-        import pytest
-
-        errno = pytest.main(self.pytest_args)
-        sys.exit(errno)
+        sys.stderr.write(
+            "%s%spython setup.py test is deprecated by pypa.  Please invoke "
+            "'tox' with no arguments for a basic test run.\n%s"
+            % (self.COLOR_SEQ % self.RED, self.BOLD_SEQ, self.RESET_SEQ)
+        )
+        sys.exit(1)
 
 
 setup(
@@ -61,9 +56,10 @@ setup(
         "Programming Language :: Python :: 2",
         "Programming Language :: Python :: 2.7",
         "Programming Language :: Python :: 3",
-        "Programming Language :: Python :: 3.4",
         "Programming Language :: Python :: 3.5",
         "Programming Language :: Python :: 3.6",
+        "Programming Language :: Python :: 3.7",
+        "Programming Language :: Python :: 3.8",
         "Programming Language :: Python :: Implementation :: CPython",
         "Programming Language :: Python :: Implementation :: PyPy",
         "Topic :: Database :: Front-Ends",
@@ -76,8 +72,7 @@ setup(
     license="MIT",
     packages=find_packages(".", exclude=["examples*", "test*"]),
     include_package_data=True,
-    tests_require=["pytest!=3.9.1,!=3.9.2", "mock", "Mako"],
-    cmdclass={"test": PyTest},
+    cmdclass={"test": UseTox},
     zip_safe=False,
     install_requires=requires,
     entry_points={"console_scripts": ["alembic = alembic.config:main"]},

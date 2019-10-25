@@ -4,6 +4,241 @@ Changelog
 ==========
 
 .. changelog::
+    :version: 1.2.1
+    :released: September 24, 2019
+
+    .. change::
+        :tags: bug, command
+        :tickets: 601
+
+        Reverted the name change of the "revisions" argument to
+        :func:`.command.stamp` to "revision" as apparently applications are
+        calling upon this argument as a keyword name.  Pull request courtesy
+        Thomas Bechtold.  Special translations are also added to the command
+        line interface so that it is still known as "revisions" in the CLI.
+
+    .. change::
+        :tags: bug, tests
+        :tickets: 592
+
+        Removed the "test requirements" from "setup.py test", as this command now
+        only emits a removal error in any case and these requirements are unused.
+
+.. changelog::
+    :version: 1.2.0
+    :released: September 20, 2019
+
+    .. change::
+        :tags: feature, command
+        :tickets: 473
+
+        Added new ``--purge`` flag to the ``alembic stamp`` command, which will
+        unconditionally erase the version table before stamping anything.  This is
+        useful for development where non-existent version identifiers might be left
+        within the table.  Additionally, ``alembic.stamp`` now supports a list of
+        revision identifiers, which are intended to allow setting up muliple heads
+        at once.  Overall handling of version identifiers within the
+        ``alembic.stamp`` command has been improved with many new tests and
+        use cases added.
+
+    .. change::
+        :tags: bug, autogenerate
+        :tickets: 550
+
+        Improved the Python rendering of a series of migration operations such that
+        a single "pass" is rendered for a :class:`.UpgradeOps` or
+        :class:`.DowngradeOps` based on if no lines of Python code actually
+        rendered under the operation, rather than whether or not sub-directives
+        exist. Removed extra "pass" lines that would generate from the
+        :class:`.ModifyTableOps` directive so that these aren't duplicated under
+        operation rewriting scenarios.
+
+
+    .. change::
+        :tags: feature, runtime
+        :tickets: 123
+
+        Added new feature :meth:`.MigrationContext.autocommit_block`, a special
+        directive which will provide for a non-transactional block inside of a
+        migration script. The feature requres that: the database driver
+        (e.g. DBAPI) supports the AUTOCOMMIT isolation mode.  The directive
+        also necessarily needs to COMMIT the existing transaction in progress
+        in order to enter autocommit mode.
+
+        .. seealso::
+
+            :meth:`.MigrationContext.autocommit_block`
+
+    .. change::
+        :tags: change: py3k
+
+        Python 3.4 support is dropped, as the upstream tooling (pip, mysqlclient)
+        etc are already dropping support for Python 3.4, which itself is no longer
+        maintained.
+
+    .. change::
+        :tags: usecase, autogenerate
+        :tickets: 518
+
+        Added autogenerate support for :class:`.Column` objects that have
+        dialect-specific ``**kwargs``, support first added in SQLAlchemy 1.3.
+        This includes SQLite "on conflict" as well as options used by some
+        third party dialects.
+
+    .. change::
+        :tags: usecase, autogenerate
+        :tickets: 131
+
+        Added rendering for SQLAlchemy ``Variant`` datatypes, which render as the
+        base type plus one or more ``.with_variant()`` method calls.
+
+
+    .. change::
+        :tags: usecase, commands
+        :tickets: 534
+
+        Made the command interface revision lookup behavior more strict in that an
+        Alembic revision number is only resolved based on a partial match rules if
+        it has at least four characters, to prevent simple typographical issues
+        from inadvertently  running migrations.
+
+     .. change::
+        :tags: feature, commands
+        :tickets: 307
+
+        Added "post write hooks" to revision generation.  These allow custom logic
+        to run after a revision Python script is generated, typically for the
+        purpose of running code formatters such as "Black" or "autopep8", but may
+        be used for any arbitrary post-render hook as well, including custom Python
+        functions or scripts.  The hooks are enabled by providing a
+        ``[post_write_hooks]`` section in the alembic.ini file.  A single hook
+        is provided which runs an arbitrary Python executable on the newly
+        generated revision script, which can be configured to run code formatters
+        such as Black; full examples are included in the documentation.
+
+        .. seealso::
+
+            :ref:`post_write_hooks`
+
+
+    .. change::
+        :tags: feature, environment
+        :tickets: 463
+
+        Added new flag ``--package`` to ``alembic init``.  For environments where
+        the Alembic migration files and such are within the package tree and
+        importable as modules, this flag can be specified which will add the
+        additional ``__init__.py`` files in the version location and the
+        environment location.
+
+    .. change::
+        :tags: bug, autogenerate
+        :tickets: 549
+
+        Fixed bug where rendering of comment text for table-level comments  within
+        :meth:`.Operations.create_table_comment` and
+        :meth:`.Operations.drop_table_comment` was not properly quote-escaped
+        within rendered Python code for autogenerate.
+
+    .. change::
+        :tags: bug, autogenerate
+        :tickets: 505
+
+        Modified the logic of the :class:`.Rewriter` object such that it keeps a
+        memoization of which directives it has processed, so that it can ensure it
+        processes a particular directive only once, and additionally fixed
+        :class:`.Rewriter` so that it functions correctly for multiple-pass
+        autogenerate schemes, such as the one illustrated in the "multidb"
+        template.  By tracking which directives have been processed, a
+        multiple-pass scheme which calls upon the :class:`.Rewriter` multiple times
+        for the same structure as elements are added can work without running
+        duplicate operations on the same elements more than once.
+
+.. changelog::
+    :version: 1.1.0
+    :released: August 26, 2019
+
+    .. change::
+        :tags: change
+
+        Alembic 1.1 bumps the minimum version of SQLAlchemy to 1.1.   As was the
+        case before, Python requirements remain at Python 2.7, or in the 3.x series
+        Python 3.4.
+
+    .. change::
+        :tags: change, internals
+
+        The test suite for Alembic now makes use of SQLAlchemy's testing framework
+        directly.  Previously, Alembic had its own version of this framework that
+        was mostly copied from that of SQLAlchemy to enable testing with older
+        SQLAlchemy versions.  The majority of this code is now removed so that both
+        projects can leverage improvements from a common testing framework.
+
+    .. change::
+        :tags: bug, commands
+        :tickets: 562
+
+        Fixed bug where the double-percent logic applied to some dialects such as
+        psycopg2 would be rendered in ``--sql`` mode, by allowing dialect options
+        to be passed through to the dialect used to generate SQL and then providing
+        ``paramstyle="named"`` so that percent signs need not be doubled.   For
+        users having this issue, existing env.py scripts need to add
+        ``dialect_opts={"paramstyle": "named"}`` to their offline
+        context.configure().  See the ``alembic/templates/generic/env.py`` template
+        for an example.
+
+    .. change::
+        :tags: bug, py3k
+
+        Fixed use of the deprecated "imp" module, which is used to detect  pep3147
+        availability as well as to locate .pyc files, which started  emitting
+        deprecation warnings during the test suite.   The warnings were not being
+        emitted earlier during the test suite, the change is possibly due to
+        changes in py.test itself but this is not clear. The check for pep3147 is
+        set to True for any Python version 3.5 or greater now and importlib is used
+        when available.  Note that some dependencies such as distutils may still be
+        emitting this warning. Tests are adjusted to accommodate for dependencies
+        that emit the warning as well.
+
+
+    .. change::
+        :tags: bug, mysql
+        :tickets: 594
+
+        Fixed issue where emitting a change of column name for MySQL did not
+        preserve the column comment, even if it were specified as existing_comment.
+
+
+    .. change::
+        :tags: bug, setup
+        :tickets: 592
+
+        Removed the "python setup.py test" feature in favor of a straight run of
+        "tox".   Per Pypa / pytest developers, "setup.py" commands are in general
+        headed towards deprecation in favor of tox.  The tox.ini script has been
+        updated such that running "tox" with no arguments will perform a single run
+        of the test suite against the default installed Python interpreter.
+
+        .. seealso::
+
+            https://github.com/pypa/setuptools/issues/1684
+
+            https://github.com/pytest-dev/pytest/issues/5534
+
+    .. change::
+        :tags: usecase, commands
+        :tickets: 571
+
+        The "alembic init" command will now proceed if the target directory exists
+        as long as it's still empty.  Previously, it would not proceed if the
+        directory existed. The new behavior is modeled from what git does, to
+        accommodate for container or other deployments where an Alembic target
+        directory may need to be already mounted instead of being created with
+        alembic init.  Pull request courtesy Aviskar KC.
+
+
+
+.. changelog::
     :version: 1.0.11
     :released: June 25, 2019
 
