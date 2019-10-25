@@ -3,7 +3,7 @@
 include /usr/share/dpkg/pkg-info.mk
 export PYBUILD_NAME=alembic
 export PYBUILD_BEFORE_TEST=cp {dir}/setup.cfg {build_dir}
-export PYBUILD_AFTER_TEST=rm {build_dir}/setup.cfg ; rm -r {build_dir}/scratch ; rm {build_dir}/test_schema.db; rm -r {build_dir}/.pytest_cache
+export PYBUILD_AFTER_TEST=rm {build_dir}/setup.cfg
 
 %:
 	dh $@ --with python2,python3,sphinxdoc --buildsystem=pybuild

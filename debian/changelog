@@ -1,3 +1,9 @@
+alembic (1.2.1-1~ubuntu1) bionic; urgency=medium
+
+  * Ubuntu release.
+
+ -- Guillaume J Humbert <guillaume.j.humbert@pm.me>  Fri, 25 Oct 2019 08:12:37 +0800
+
 alembic (1.0.0-2) unstable; urgency=medium
 
   * Team upload.
