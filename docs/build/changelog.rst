@@ -4,6 +4,521 @@ Changelog
 ==========
 
 .. changelog::
+    :version: 1.2.1
+    :released: September 24, 2019
+
+    .. change::
+        :tags: bug, command
+        :tickets: 601
+
+        Reverted the name change of the "revisions" argument to
+        :func:`.command.stamp` to "revision" as apparently applications are
+        calling upon this argument as a keyword name.  Pull request courtesy
+        Thomas Bechtold.  Special translations are also added to the command
+        line interface so that it is still known as "revisions" in the CLI.
+
+    .. change::
+        :tags: bug, tests
+        :tickets: 592
+
+        Removed the "test requirements" from "setup.py test", as this command now
+        only emits a removal error in any case and these requirements are unused.
+
+.. changelog::
+    :version: 1.2.0
+    :released: September 20, 2019
+
+    .. change::
+        :tags: feature, command
+        :tickets: 473
+
+        Added new ``--purge`` flag to the ``alembic stamp`` command, which will
+        unconditionally erase the version table before stamping anything.  This is
+        useful for development where non-existent version identifiers might be left
+        within the table.  Additionally, ``alembic.stamp`` now supports a list of
+        revision identifiers, which are intended to allow setting up muliple heads
+        at once.  Overall handling of version identifiers within the
+        ``alembic.stamp`` command has been improved with many new tests and
+        use cases added.
+
+    .. change::
+        :tags: bug, autogenerate
+        :tickets: 550
+
+        Improved the Python rendering of a series of migration operations such that
+        a single "pass" is rendered for a :class:`.UpgradeOps` or
+        :class:`.DowngradeOps` based on if no lines of Python code actually
+        rendered under the operation, rather than whether or not sub-directives
+        exist. Removed extra "pass" lines that would generate from the
+        :class:`.ModifyTableOps` directive so that these aren't duplicated under
+        operation rewriting scenarios.
+
+
+    .. change::
+        :tags: feature, runtime
+        :tickets: 123
+
+        Added new feature :meth:`.MigrationContext.autocommit_block`, a special
+        directive which will provide for a non-transactional block inside of a
+        migration script. The feature requres that: the database driver
+        (e.g. DBAPI) supports the AUTOCOMMIT isolation mode.  The directive
+        also necessarily needs to COMMIT the existing transaction in progress
+        in order to enter autocommit mode.
+
+        .. seealso::
+
+            :meth:`.MigrationContext.autocommit_block`
+
+    .. change::
+        :tags: change: py3k
+
+        Python 3.4 support is dropped, as the upstream tooling (pip, mysqlclient)
+        etc are already dropping support for Python 3.4, which itself is no longer
+        maintained.
+
+    .. change::
+        :tags: usecase, autogenerate
+        :tickets: 518
+
+        Added autogenerate support for :class:`.Column` objects that have
+        dialect-specific ``**kwargs``, support first added in SQLAlchemy 1.3.
+        This includes SQLite "on conflict" as well as options used by some
+        third party dialects.
+
+    .. change::
+        :tags: usecase, autogenerate
+        :tickets: 131
+
+        Added rendering for SQLAlchemy ``Variant`` datatypes, which render as the
+        base type plus one or more ``.with_variant()`` method calls.
+
+
+    .. change::
+        :tags: usecase, commands
+        :tickets: 534
+
+        Made the command interface revision lookup behavior more strict in that an
+        Alembic revision number is only resolved based on a partial match rules if
+        it has at least four characters, to prevent simple typographical issues
+        from inadvertently  running migrations.
+
+     .. change::
+        :tags: feature, commands
+        :tickets: 307
+
+        Added "post write hooks" to revision generation.  These allow custom logic
+        to run after a revision Python script is generated, typically for the
+        purpose of running code formatters such as "Black" or "autopep8", but may
+        be used for any arbitrary post-render hook as well, including custom Python
+        functions or scripts.  The hooks are enabled by providing a
+        ``[post_write_hooks]`` section in the alembic.ini file.  A single hook
+        is provided which runs an arbitrary Python executable on the newly
+        generated revision script, which can be configured to run code formatters
+        such as Black; full examples are included in the documentation.
+
+        .. seealso::
+
+            :ref:`post_write_hooks`
+
+
+    .. change::
+        :tags: feature, environment
+        :tickets: 463
+
+        Added new flag ``--package`` to ``alembic init``.  For environments where
+        the Alembic migration files and such are within the package tree and
+        importable as modules, this flag can be specified which will add the
+        additional ``__init__.py`` files in the version location and the
+        environment location.
+
+    .. change::
+        :tags: bug, autogenerate
+        :tickets: 549
+
+        Fixed bug where rendering of comment text for table-level comments  within
+        :meth:`.Operations.create_table_comment` and
+        :meth:`.Operations.drop_table_comment` was not properly quote-escaped
+        within rendered Python code for autogenerate.
+
+    .. change::
+        :tags: bug, autogenerate
+        :tickets: 505
+
+        Modified the logic of the :class:`.Rewriter` object such that it keeps a
+        memoization of which directives it has processed, so that it can ensure it
+        processes a particular directive only once, and additionally fixed
+        :class:`.Rewriter` so that it functions correctly for multiple-pass
+        autogenerate schemes, such as the one illustrated in the "multidb"
+        template.  By tracking which directives have been processed, a
+        multiple-pass scheme which calls upon the :class:`.Rewriter` multiple times
+        for the same structure as elements are added can work without running
+        duplicate operations on the same elements more than once.
+
+.. changelog::
+    :version: 1.1.0
+    :released: August 26, 2019
+
+    .. change::
+        :tags: change
+
+        Alembic 1.1 bumps the minimum version of SQLAlchemy to 1.1.   As was the
+        case before, Python requirements remain at Python 2.7, or in the 3.x series
+        Python 3.4.
+
+    .. change::
+        :tags: change, internals
+
+        The test suite for Alembic now makes use of SQLAlchemy's testing framework
+        directly.  Previously, Alembic had its own version of this framework that
+        was mostly copied from that of SQLAlchemy to enable testing with older
+        SQLAlchemy versions.  The majority of this code is now removed so that both
+        projects can leverage improvements from a common testing framework.
+
+    .. change::
+        :tags: bug, commands
+        :tickets: 562
+
+        Fixed bug where the double-percent logic applied to some dialects such as
+        psycopg2 would be rendered in ``--sql`` mode, by allowing dialect options
+        to be passed through to the dialect used to generate SQL and then providing
+        ``paramstyle="named"`` so that percent signs need not be doubled.   For
+        users having this issue, existing env.py scripts need to add
+        ``dialect_opts={"paramstyle": "named"}`` to their offline
+        context.configure().  See the ``alembic/templates/generic/env.py`` template
+        for an example.
+
+    .. change::
+        :tags: bug, py3k
+
+        Fixed use of the deprecated "imp" module, which is used to detect  pep3147
+        availability as well as to locate .pyc files, which started  emitting
+        deprecation warnings during the test suite.   The warnings were not being
+        emitted earlier during the test suite, the change is possibly due to
+        changes in py.test itself but this is not clear. The check for pep3147 is
+        set to True for any Python version 3.5 or greater now and importlib is used
+        when available.  Note that some dependencies such as distutils may still be
+        emitting this warning. Tests are adjusted to accommodate for dependencies
+        that emit the warning as well.
+
+
+    .. change::
+        :tags: bug, mysql
+        :tickets: 594
+
+        Fixed issue where emitting a change of column name for MySQL did not
+        preserve the column comment, even if it were specified as existing_comment.
+
+
+    .. change::
+        :tags: bug, setup
+        :tickets: 592
+
+        Removed the "python setup.py test" feature in favor of a straight run of
+        "tox".   Per Pypa / pytest developers, "setup.py" commands are in general
+        headed towards deprecation in favor of tox.  The tox.ini script has been
+        updated such that running "tox" with no arguments will perform a single run
+        of the test suite against the default installed Python interpreter.
+
+        .. seealso::
+
+            https://github.com/pypa/setuptools/issues/1684
+
+            https://github.com/pytest-dev/pytest/issues/5534
+
+    .. change::
+        :tags: usecase, commands
+        :tickets: 571
+
+        The "alembic init" command will now proceed if the target directory exists
+        as long as it's still empty.  Previously, it would not proceed if the
+        directory existed. The new behavior is modeled from what git does, to
+        accommodate for container or other deployments where an Alembic target
+        directory may need to be already mounted instead of being created with
+        alembic init.  Pull request courtesy Aviskar KC.
+
+
+
+.. changelog::
+    :version: 1.0.11
+    :released: June 25, 2019
+
+    .. change::
+        :tags: bug, sqlite, autogenerate, batch
+        :tickets: 579
+
+        SQLite server default reflection will ensure parenthesis are surrounding a
+        column default expression that is detected as being a non-constant
+        expression, such as a ``datetime()`` default, to accommodate for the
+        requirement that SQL expressions have to be parenthesized when being sent
+        as DDL.  Parenthesis are not added to constant expressions to allow for
+        maximum cross-compatibility with other dialects and existing test suites
+        (such as Alembic's), which necessarily entails scanning the expression to
+        eliminate for constant numeric and string values. The logic is added to the
+        two "reflection->DDL round trip" paths which are currently autogenerate and
+        batch migration.  Within autogenerate, the logic is on the rendering side,
+        whereas in batch the logic is installed as a column reflection hook.
+
+
+    .. change::
+        :tags: bug, sqlite, autogenerate
+        :tickets: 579
+
+        Improved SQLite server default comparison to accommodate for a ``text()``
+        construct that added parenthesis directly vs. a construct that relied
+        upon the SQLAlchemy SQLite dialect to render the parenthesis, as well
+        as improved support for various forms of constant expressions such as
+        values that are quoted vs. non-quoted.
+
+
+    .. change::
+        :tags: bug, autogenerate
+
+        Fixed bug where the "literal_binds" flag was not being set when
+        autogenerate would create a server default value, meaning server default
+        comparisons would fail for functions that contained literal values.
+
+    .. change::
+       :tags: bug, mysql
+       :tickets: 554
+
+       Added support for MySQL "DROP CHECK", which is added as of MySQL 8.0.16,
+       separate from MariaDB's "DROP CONSTRAINT" for CHECK constraints.  The MySQL
+       Alembic implementation now checks for "MariaDB" in server_version_info to
+       decide which one to use.
+
+
+
+    .. change::
+        :tags: bug, mysql, operations
+        :tickets: 564
+
+        Fixed issue where MySQL databases need to use CHANGE COLUMN when altering a
+        server default of CURRENT_TIMESTAMP, NOW() and probably other functions
+        that are only usable with DATETIME/TIMESTAMP columns.  While MariaDB
+        supports both CHANGE and ALTER COLUMN in this case, MySQL databases only
+        support CHANGE.  So the new logic is that if the server default change is
+        against a DateTime-oriented column, the CHANGE format is used
+        unconditionally, as in the vast majority of cases the server default is to
+        be CURRENT_TIMESTAMP which may also be potentially bundled with an "ON
+        UPDATE CURRENT_TIMESTAMP" directive, which SQLAlchemy does not currently
+        support as a distinct field.  The fix addiionally improves the server
+        default comparison logic when the "ON UPDATE" clause is present and
+        there are parenthesis to be adjusted for as is the case on some MariaDB
+        versions.
+
+
+
+    .. change::
+        :tags: bug, environment
+
+        Warnings emitted by Alembic now include a default stack level of 2, and in
+        some cases it's set to 3, in order to help warnings indicate more closely
+        where they are originating from.  Pull request courtesy Ash Berlin-Taylor.
+
+
+    .. change::
+        :tags: bug, py3k
+        :tickets: 563
+
+        Replaced the Python compatbility routines for ``getargspec()`` with a fully
+        vendored version based on ``getfullargspec()`` from Python 3.3.
+        Originally, Python was emitting deprecation warnings for this function in
+        Python 3.8 alphas.  While this change was reverted, it was observed that
+        Python 3 implementations for ``getfullargspec()`` are an order of magnitude
+        slower as of the 3.4 series where it was rewritten against ``Signature``.
+        While Python plans to improve upon this situation, SQLAlchemy projects for
+        now are using a simple replacement to avoid any future issues.
+
+
+.. changelog::
+    :version: 1.0.10
+    :released: April 28, 2019
+
+    .. change::
+       :tags: bug, commands
+       :tickets: 552
+
+       Fixed bug introduced in release 0.9.0 where the helptext for commands
+       inadvertently got expanded to include function docstrings from the
+       command.py module.  The logic has been adjusted to only refer to the first
+       line(s) preceding the first line break within each docstring, as was the
+       original intent.
+
+    .. change::
+        :tags: bug, operations, mysql
+        :tickets: 551
+
+        Added an assertion in :meth:`.RevisionMap.get_revisions` and other methods
+        which ensures revision numbers are passed as strings or collections of
+        strings.   Driver issues particularly on MySQL may inadvertently be passing
+        bytes here which leads to failures later on.
+
+    .. change::
+        :tags: bug, autogenerate, mysql
+        :tickets: 553
+
+        Fixed bug when using the
+        :paramref:`.EnvironmentContext.configure.compare_server_default` flag set
+        to ``True`` where a server default that is introduced in the table metadata
+        on an ``Integer`` column, where there is no existing server default in the
+        database, would raise a ``TypeError``.
+
+.. changelog::
+    :version: 1.0.9
+    :released: April 15, 2019
+
+    .. change::
+       :tags: bug, operations
+       :tickets: 548
+
+       Simplified the internal scheme used to generate the ``alembic.op`` namespace
+       to no longer attempt to generate full method signatures (e.g. rather than
+       generic ``*args, **kw``) as this was not working in most cases anyway, while
+       in rare circumstances it would in fact sporadically have access to the real
+       argument names and then fail when generating the function due to missing
+       symbols in the argument signature.
+
+.. changelog::
+    :version: 1.0.8
+    :released: March 4, 2019
+
+    .. change::
+       :tags: bug, operations
+       :tickets: 528
+
+       Removed use of deprecated ``force`` parameter for SQLAlchemy quoting
+       functions as this parameter will be removed in a future release.
+       Pull request courtesy Parth Shandilya(ParthS007).
+
+    .. change::
+       :tags: bug, autogenerate, postgresql, py3k
+       :tickets: 541
+
+       Fixed issue where server default comparison on the PostgreSQL dialect would
+       fail for a blank string on Python 3.7 only, due to a change in regular
+       expression behavior in Python 3.7.
+
+
+.. changelog::
+    :version: 1.0.7
+    :released: January 25, 2019
+
+    .. change::
+       :tags: bug, autogenerate
+       :tickets: 529
+
+       Fixed issue in new comment support where autogenerated Python code
+       for comments wasn't using ``repr()`` thus causing issues with
+       quoting.  Pull request courtesy Damien Garaud.
+
+.. changelog::
+    :version: 1.0.6
+    :released: January 13, 2019
+
+    .. change::
+        :tags: feature, operations
+        :tickets: 422
+
+        Added Table and Column level comments for supported backends.
+        New methods :meth:`.Operations.create_table_comment` and
+        :meth:`.Operations.drop_table_comment` are added.  A new arguments
+        :paramref:`.Operations.alter_column.comment` and
+        :paramref:`.Operations.alter_column.existing_comment` are added to
+        :meth:`.Operations.alter_column`.   Autogenerate support is also added
+        to ensure comment add/drops from tables and columns are generated as well
+        as that :meth:`.Operations.create_table`, :meth:`.Operations.add_column`
+        both include the comment field from the source :class:`.Table`
+        or :class:`.Column` object.
+
+.. changelog::
+    :version: 1.0.5
+    :released: November 27, 2018
+
+    .. change::
+        :tags: bug, py3k
+        :tickets: 507
+
+        Resolved remaining Python 3 deprecation warnings, covering
+        the use of inspect.formatargspec() with a vendored version
+        copied from the Python standard library, importing
+        collections.abc above Python 3.3 when testing against abstract
+        base classes, fixed one occurrence of log.warn(), as well as a few
+        invalid escape sequences.
+
+.. changelog::
+    :version: 1.0.4
+    :released: November 27, 2018
+
+    .. change::
+       :tags: change
+
+       Code hosting has been moved to GitHub, at
+       https://github.com/sqlalchemy/alembic.  Additionally, the
+       main Alembic website documentation URL is now
+       https://alembic.sqlalchemy.org.
+
+.. changelog::
+    :version: 1.0.3
+    :released: November 14, 2018
+
+    .. change::
+        :tags: bug, mssql
+        :tickets: 516
+
+       Fixed regression caused by :ticket:`513`, where the logic to consume
+       ``mssql_include`` was not correctly interpreting the case where the flag
+       was not present, breaking the ``op.create_index`` directive for SQL Server
+       as a whole.
+
+.. changelog::
+    :version: 1.0.2
+    :released: October 31, 2018
+
+    .. change::
+       :tags: bug, autogenerate
+       :tickets: 515
+
+       The ``system=True`` flag on :class:`.Column`, used primarily in conjunction
+       with the Postgresql "xmin" column, now renders within the autogenerate
+       render process, allowing the column to be excluded from DDL.  Additionally,
+       adding a system=True column to a model will produce no autogenerate diff as
+       this column is implicitly present in the database.
+
+    .. change::
+       :tags: bug, mssql
+       :tickets: 513
+
+       Fixed issue where usage of the SQL Server ``mssql_include`` option within a
+       :meth:`.Operations.create_index` would raise a KeyError, as the additional
+       column(s) need to be added to the table object used by the construct
+       internally.
+
+.. changelog::
+    :version: 1.0.1
+    :released: October 17, 2018
+
+    .. change::
+        :tags: bug, commands
+        :tickets: 497
+
+        Fixed an issue where revision descriptions were essentially
+        being formatted twice. Any revision description that contained
+        characters like %, writing output to stdout will fail because
+        the call to config.print_stdout attempted to format any
+        additional args passed to the function.
+        This fix now only applies string formatting if any args are provided
+        along with the output text.
+
+    .. change::
+       :tags: bug, autogenerate
+       :tickets: 512
+
+       Fixed issue where removed method ``union_update()`` was used when a
+       customized :class:`.MigrationScript` instance included entries in the
+       ``.imports`` data member, raising an AttributeError.
+
+
+.. changelog::
     :version: 1.0.0
     :released: July 13, 2018
     :released: July 13, 2018
@@ -230,7 +745,6 @@ Changelog
 
     .. change::
         :tags: bug, autogenerate
-        :pullreq: bitbucket:70
 
         Fixed bug where comparison of ``Numeric`` types would produce
         a difference if the Python-side ``Numeric`` inadvertently specified
@@ -738,7 +1252,6 @@ Changelog
     .. change::
       :tags: bug, batch
       :tickets: 361
-      :pullreq: bitbucket:55
 
       Fixed bug introduced by the fix for :ticket:`338` in version 0.8.4
       where a server default could no longer be dropped in batch mode.
@@ -746,7 +1259,6 @@ Changelog
 
     .. change::
       :tags: bug, batch, mssql
-      :pullreq: bitbucket:53
 
       Fixed bug where SQL Server arguments for drop_column() would not
       be propagated when running under a batch block.  Pull request
@@ -759,7 +1271,6 @@ Changelog
     .. change::
       :tags: bug, autogenerate
       :tickets: 335
-      :pullreq: bitbucket:49
 
       Fixed bug where the columns rendered in a ``PrimaryKeyConstraint``
       in autogenerate would inappropriately render the "key" of the
@@ -792,7 +1303,6 @@ Changelog
 
     .. change::
       :tags: feature, versioning
-      :pullreq: bitbucket:51
 
       A major improvement to the hash id generation function, which for some
       reason used an awkward arithmetic formula against uuid4() that produced
@@ -802,7 +1312,6 @@ Changelog
 
     .. change::
       :tags: feature, autogenerate
-      :pullreq: github:20
 
       Added an autogenerate renderer for the :class:`.ExecuteSQLOp` operation
       object; only renders if given a plain SQL string, otherwise raises
@@ -879,7 +1388,6 @@ Changelog
 
     .. change::
       :tags: bug, tests
-      :pullreq: bitbucket:47
 
       Added "pytest-xdist" as a tox dependency, so that the -n flag
       in the test command works if this is not already installed.
@@ -988,7 +1496,6 @@ Changelog
 
     .. change::
       :tags: feature, commands
-      :pullreq: bitbucket:46
 
       Added new command ``alembic edit``.  This command takes the same
       arguments as ``alembic show``, however runs the target script
@@ -1237,7 +1744,6 @@ Changelog
     .. change::
       :tags: bug, autogenerate
       :tickets: 266
-      :pullreq: bitbucket:39
 
       The ``--autogenerate`` option is not valid when used in conjunction
       with "offline" mode, e.g. ``--sql``.  This now raises a ``CommandError``,
@@ -1329,7 +1835,6 @@ Changelog
     .. change::
       :tags: bug, autogenerate, postgresql
       :tickets: 241
-      :pullreq: bitbucket:37
 
       Repaired issue where a server default specified without ``text()``
       that represented a numeric or floating point (e.g. with decimal places)
@@ -1366,7 +1871,6 @@ Changelog
     .. change::
       :tags: bug, autogenerate
       :tickets: 261
-      :pullreq: github:17
 
       Fixed issue in autogenerate type rendering where types that belong
       to modules that have the name "sqlalchemy" in them would be mistaken
@@ -1408,7 +1912,6 @@ Changelog
     .. change::
       :tags: bug, mysql
       :tickets: 251
-      :pullreq: bitbucket:35
 
       Fixed an issue where the MySQL routine to skip foreign-key-implicit
       indexes would also catch unnamed unique indexes, as they would be
@@ -1437,7 +1940,6 @@ Changelog
     .. change::
       :tags: feature, autogenerate
       :tickets: 178
-      :pullreq: bitbucket:32
 
       Support for autogenerate of FOREIGN KEY constraints has been added.
       These are delivered within the autogenerate process in the same
@@ -1459,7 +1961,6 @@ Changelog
 
     .. change::
       :tags: bug, batch
-      :pullreq: bitbucket:34
 
       Fixed bug where the "source_schema" argument was not correctly passed
       when calling :meth:`.BatchOperations.create_foreign_key`.  Pull
@@ -1622,7 +2123,6 @@ Changelog
 
     .. change::
       :tags: feature, config
-      :pullreq: bitbucket:33
 
       Added new argument :paramref:`.Config.config_args`, allows a dictionary
       of replacement variables to be passed which will serve as substitution
@@ -1652,7 +2152,6 @@ Changelog
     .. change::
       :tags: bug, operations
       :tickets: 174
-      :pullreq: bitbucket:29
 
       The :meth:`.Operations.add_column` directive will now additionally emit
       the appropriate ``CREATE INDEX`` statement if the
@@ -1821,7 +2320,6 @@ Changelog
 
     .. change::
       :tags: bug, mssql
-      :pullreq: bitbucket:26
 
       Fixed bug in MSSQL dialect where "rename table" wasn't using
       ``sp_rename()`` as is required on SQL Server.  Pull request courtesy
@@ -1846,7 +2344,6 @@ Changelog
     .. change::
       :tags: bug
       :tickets: 95
-      :pullreq: bitbucket:24
 
       A file named ``__init__.py`` in the ``versions/`` directory is now
       ignored by Alembic when the collection of version files is retrieved.
@@ -1854,7 +2351,6 @@ Changelog
 
     .. change::
       :tags: bug
-      :pullreq: bitbucket:23
 
       Fixed Py3K bug where an attempt would be made to sort None against
       string values when autogenerate would detect tables across multiple
@@ -1863,7 +2359,6 @@ Changelog
 
     .. change::
       :tags: bug
-      :pullreq: github:15
 
       Autogenerate render will render the arguments within a Table construct
       using ``*[...]`` when the number of columns/elements is greater than
@@ -1871,7 +2366,6 @@ Changelog
 
     .. change::
       :tags: bug
-      :pullreq: github:14
 
       Fixed bug where foreign key constraints would fail to render in
       autogenerate when a schema name was present.  Pull request courtesy
@@ -1908,7 +2402,6 @@ Changelog
 
     .. change::
       :tags: feature
-      :pullreq: github:10
 
       Added a new accessor :attr:`.MigrationContext.config`, when used
       in conjunction with a :class:`.EnvironmentContext` and
@@ -2100,7 +2593,6 @@ Changelog
 
     .. change::
       :tags: feature
-      :pullreq: bitbucket:20
 
       The :func:`.command.revision` command now returns the :class:`.Script`
       object corresponding to the newly generated revision.  From this
@@ -2146,7 +2638,6 @@ Changelog
 
     .. change::
       :tags: bug
-      :pullreq: github:9
 
       The :func:`.compare_metadata` public API function now takes into
       account the settings for
@@ -2166,7 +2657,6 @@ Changelog
 
     .. change::
       :tags: bug
-      :pullreq: bitbucket:17
 
      Enabled schema support for index and unique constraint autodetection;
      previously these were non-functional and could in some cases lead to
@@ -2272,7 +2762,6 @@ Changelog
 
     .. change::
       :tags: bug, mssql
-      :pullreq: bitbucket:13
 
       The MSSQL backend will add the batch separator (e.g. ``"GO"``)
       in ``--sql`` mode after the final ``COMMIT`` statement, to ensure
@@ -2293,7 +2782,6 @@ Changelog
 
     .. change::
       :tags: feature
-      :pullreq: bitbucket:12
 
       Expanded the size of the "slug" generated by "revision" to 40
       characters, which is also configurable by new field
@@ -2311,7 +2799,6 @@ Changelog
 
     .. change::
       :tags: bug
-      :pullreq: bitbucket:9
 
       Fixes to Py3k in-place compatibity regarding output encoding and related;
       the use of the new io.* package introduced some incompatibilities on Py2k.
@@ -3305,8 +3792,7 @@ Changelog
 
       The author asks that you *please* report all
       issues, missing features, workarounds etc.
-      to the bugtracker, at
-      https://bitbucket.org/zzzeek/alembic/issues/new .
+      to the bugtracker.
 
     .. change::
         :tags:

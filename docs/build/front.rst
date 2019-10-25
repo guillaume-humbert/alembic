@@ -7,15 +7,12 @@ Information about the Alembic project.
 Project Homepage
 ================
 
-Alembic is hosted on `Bitbucket <http://bitbucket.org>`_ - the lead project
-page is at https://bitbucket.org/zzzeek/alembic. Source code is tracked here
-using `Git <http://git-scm.com/>`_.
+Alembic is hosted on GitHub at https://github.com/sqlalchemy/alembic under the SQLAlchemy organization.
 
-Releases and project status are available on Pypi at
-http://pypi.python.org/pypi/alembic.
+Releases and project status are available on Pypi at https://pypi.python.org/pypi/alembic.
 
-The most recent published version of this documentation should be at
-http://alembic.zzzcomputing.com/.
+The most recent published version of this documentation should be at https://alembic.sqlalchemy.org.
+
 
 .. _installation:
 
@@ -43,9 +40,11 @@ newer versions such as the 1.1 or 1.2 series.
 
 .. versionchanged:: 1.0.0 Support for SQLAlchemy 0.8 and 0.7.9 was dropped.
 
-Alembic supports Python versions 2.7, 3.4 and above.
+Alembic supports Python versions 2.7, 3.5 and above.
 
 .. versionchanged::  1.0.0  Support for Python 2.6 and 3.3 was dropped.
+
+.. versionchanged::  1.1.1  Support for Python 3.4 was dropped.
 
 Community
 =========
@@ -61,8 +60,9 @@ to the Alembic Google Group at `sqlalchemy-alembic <https://groups.google.com/gr
 
 Bugs
 ====
-Bugs and feature enhancements to Alembic should be reported on the `Bitbucket
-issue tracker <https://bitbucket.org/zzzeek/alembic/issues?status=new&status=open>`_.
 
+Bugs and feature enhancements to Alembic should be reported on the `GitHub
+issue tracker
+<https://github.com/sqlalchemy/alembic/issues/>`_.
 
-.. _SQLAlchemy: http://www.sqlalchemy.org
+.. _SQLAlchemy: https://www.sqlalchemy.org
