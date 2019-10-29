@@ -28,7 +28,7 @@ Build-Depends-Indep:
  python3-mock,
  python3-pytest,
  python3-sqlalchemy (>= 1.0),
-Standards-Version: 4.2.0
+Standards-Version: 4.1.4
 Vcs-Browser: https://salsa.debian.org/python-team/modules/alembic
 Vcs-Git: https://salsa.debian.org/python-team/modules/alembic.git
 Homepage: https://bitbucket.org/zzzeek/alembic
