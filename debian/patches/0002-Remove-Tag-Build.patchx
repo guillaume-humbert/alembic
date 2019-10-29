@@ -1,0 +1,12 @@
+diff --git a/setup.cfg b/setup.cfg
+index 316b252..f37856b 100644
+--- a/setup.cfg
++++ b/setup.cfg
+@@ -1,5 +1,5 @@
+ [egg_info]
+-tag_build=dev
++tag_build=
+ 
+ [bdist_wheel]
+ universal = 1
+ 
